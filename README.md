@@ -1,2 +1,15 @@
 # Cognex
-Cognex is a single-node, in-memory key–value database that will progressively evolve to support persistence, crash recovery, and concurrent access.
+
+Cognex is a single-node key–value database built incrementally
+to understand storage engine fundamentals.
+
+## Current State
+- In-memory key–value store
+- Single-threaded
+- No persistence
+
+## Roadmap
+- Write-ahead logging (durability)
+- Crash recovery
+- Concurrent reads/writes
+- Context & metadata layer
