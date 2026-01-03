@@ -9,7 +9,7 @@ void Cognex::put(const std::string& key, const std::string& value)
 	store[key]= value;
 }
 
-std::optional<std::string> Cognex::get(const std::string& key)
+std::optional<std::string> Cognex::get(const std::string& key) const
 {
 	auto it = store.find(key);
 	if(it==store.end())return std::nullopt;
