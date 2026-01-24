@@ -58,4 +58,3 @@ Cognex periodically writes the full in-memory state to disk as a snapshot.
 - Independent of WAL history
 - Stored in a simple, human-readable format
 
-Example snapshot:
