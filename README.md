@@ -1,66 +1,61 @@
 # Cognex
 
-Cognex is a single-node key–value database built incrementally
-to understand storage engine fundamentals.
+Cognex is a single-node, persistent key–value database built incrementally to understand real database internals such as durability, crash recovery, and storage invariants.
 
-The project evolves through well-defined versions, each adding
-one core database capability while preserving correctness.
-
----
-
-## Current State
-
-### v0 — In-Memory KV Store
-- In-memory key–value storage
-- Single-threaded
-- No persistence
-
-### v1 — Write-Ahead Logging (Current)
-- Persistent storage using WAL
-- Crash recovery via log replay
-- Single-node, single-threaded
-- Deterministic durability semantics
+The project is developed **version by version**, with each version freezing a clear set of guarantees before moving forward.  
+Cognex prioritizes **correctness and clarity over performance**.
 
 ---
 
-## Guarantees (v1)
+## Project Goals
 
-- A write is considered **committed only after WAL fsync**
-- Crashes after fsync do **not lose data**
-- Crashes before fsync **may lose recent writes**
-- Recovery deterministically rebuilds state by replaying WAL
-
----
-
-## Non-Goals (v1)
-
-- No concurrency
-- No snapshots
-- No WAL truncation
-- No performance optimizations
-
-These are intentionally deferred to later versions.
+- Learn how real databases are built internally
+- Implement correctness before optimization
+- Evolve features incrementally with explicit guarantees
+- Keep the system simple, inspectable, and auditable
 
 ---
 
-## Usage
+## Version Overview
 
-### Prerequisites
-- C++17 compatible compiler
-- CMake >= 3.10
-- Git
+| Version | Description |
+|------|------------|
+| v0 | In-memory key–value store |
+| v1 | Write-Ahead Log (WAL) with crash recovery |
+| v2 | Snapshots (checkpointing) and WAL truncation |
+| v3 (planned) | Concurrent reads and writes |
 
 ---
 
-### Build
+## Cognex v2 — Snapshots & WAL Truncation
 
-```bash
-git clone https://github.com/Subham1100/Cognex.git
-cd Cognex/versions/cognex_v1
+Cognex v2 extends the durability guarantees of v1 by introducing **snapshots (checkpoints)**.  
+This makes recovery time and disk usage **bounded**, turning Cognex into a practical single-node storage engine.
 
-mkdir build
-mkdir -p data
-cd build
+---
 
-cmake ..
-make
+## Why v2 Exists
+
+In v1, all writes were persisted using a Write-Ahead Log (WAL).  
+While correct, this approach had inherent limitations:
+
+- WAL size grew indefinitely
+- Startup time increased linearly with WAL length
+
+These are expected constraints of a WAL-only system.
+
+v2 solves this by introducing snapshotting.
+
+---
+
+## Key Features in v2
+
+### Snapshots (Checkpointing)
+
+Cognex periodically writes the full in-memory state to disk as a snapshot.
+
+- Represents a fully materialized database state
+- Independent of WAL history
+- Stored in a simple, human-readable format
+
+Example snapshot:
