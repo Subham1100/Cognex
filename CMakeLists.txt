@@ -1,22 +1,25 @@
 cmake_minimum_required(VERSION 3.10)
-project(cognex_v2)
+project(cognex)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find zlib for CRC32
+# Find zlib (for WAL CRC)
 find_package(ZLIB REQUIRED)
 
 add_executable(cognex
-    src/main.cpp
-    src/cognex.cpp
-    src/wal.cpp
-    src/snapshot.cpp
+    cli/main.cpp
+    cli/repl.cpp
+
+    engine/src/cognex.cpp
+    engine/src/wal.cpp
+    engine/src/snapshot.cpp
 )
 
 target_include_directories(cognex
     PRIVATE
-        ${PROJECT_SOURCE_DIR}/include
+        engine/include
+        cli
 )
 
 target_link_libraries(cognex

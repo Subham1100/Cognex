@@ -1,9 +1,11 @@
 #include "wal.h"
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdexcept>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <zlib.h>
 
 // ---------- helpers ----------
@@ -40,9 +42,9 @@ static uint32_t crc32_str(const std::string& s)
 }
 
 
-void append_and_fsync(const std::string& path, const std::string& record)
+void append_and_fsync(const WalPath& path, const std::string& record)
 {
-    int fd = open(path.c_str(),O_CREAT | O_WRONLY | O_APPEND, 0644);
+    int fd = open(path.value.c_str(),O_CREAT | O_WRONLY | O_APPEND, 0644);
     if(fd<0)throw std::runtime_error("open WAL failed");
 
     uint32_t len = record.size();
@@ -62,23 +64,23 @@ void append_and_fsync(const std::string& path, const std::string& record)
 
 // ---------- WAL replay ----------
 
-bool wal_replay(const std::string& path, void(*apply)(const std::string_view& record))
+bool wal_replay(const WalPath& path, void(*apply)(const std::string_view& record))
 {
-	int fd = open(path.c_str(),O_RDONLY);
+	int fd = open(path.value.c_str(),O_RDONLY);
 	if(fd<0)return true;
 
 	while(true)
 	{
 		uint32_t len;
-		ssize_t n = read(fd,&len,sizeof(len));
+		ssize_t n = read_all(fd, &len, sizeof(len));
 		if(n==0)break;
 		if(n!= sizeof(len))break;
 
 		std::string record(len, '\0');
-		if(read(fd,record.data(),len)!=(ssize_t)len)break;
+		if(read_all(fd,record.data(),len)!=(ssize_t)len)break;
 
 		uint32_t checksum;
-		if(read(fd,&checksum,sizeof(checksum))!=sizeof(checksum))break;
+		if(read_all(fd,&checksum,sizeof(checksum))!=sizeof(checksum))break;
 
 		if(crc32_str(record)!= checksum)break;
 
@@ -92,8 +94,8 @@ bool wal_replay(const std::string& path, void(*apply)(const std::string_view& re
 
 // ---------- WAL truncate ----------
 
-void wal_truncate(const std::string& path) {
-    int fd = open(path.c_str(), O_WRONLY | O_TRUNC);
+void wal_truncate(const WalPath& path) {
+    int fd = open(path.value.c_str(), O_WRONLY | O_TRUNC);
     if (fd >= 0) {
         fsync(fd);
         close(fd);
