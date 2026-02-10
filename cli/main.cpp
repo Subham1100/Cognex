@@ -1,9 +1,13 @@
 #include "repl.h"
 #include "cognex.h"
+#include <filesystem>
+
 
 int main()
 {
-	Cognex db(WalPath{"../data/wal.log"},SnapshotPath{"../data/snapshot.dat"});
+	std::filesystem::create_directories("cognex-data");
+
+	Cognex db(WalPath{"cognex-data/data/wal.log"},SnapshotPath{"cognex-data/data/snapshot.dat"});
 	db.recover();
 
 	run_repl(db);
