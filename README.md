@@ -39,7 +39,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-##Example Usage
+## Example Usage
 
 Inside the Cognex prompt:
 ```
@@ -51,25 +51,25 @@ Alice
 [Sucess]
 ```
 
-##This directory contains:
+## This directory contains:
 
 -Write-ahead log files
 -Snapshot files
 -Metadata required for recovery
 
-##On startup, Cognex automatically:
+## On startup, Cognex automatically:
 
 -Loads the latest snapshot (if present)
 -Replays the WAL
 -Restores the database to a consistent state
 
-##Crash Safety & Recovery
+## Crash Safety & Recovery
 
 -Every write is first recorded in the WAL
 -Periodic snapshots reduce recovery time
 -On crash or restart, Cognex guarantees no committed data is lost
 
-##Build Requirements
+## Build Requirements
 
 To build Cognex from source, you need:
 
