@@ -23,4 +23,8 @@ cmake --install build --prefix "$INSTALL_PREFIX"
 
 echo "Cognex installed successfully!"
 echo "Binary location: $INSTALL_PREFIX/bin/cognex"
-echo "Run with: $INSTALL_PREFIX/bin/cognex"
+cd "$INSTALL_PREFIX/bin/"
+echo "Run with: ./cognex"
+echo "Starting Cognex..."
+./cognex || true
+
