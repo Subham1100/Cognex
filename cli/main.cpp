@@ -1,15 +1,24 @@
 #include "repl.h"
 #include "cognex.h"
 #include <filesystem>
+#include <cstdlib>
+#include <stdexcept>
 
 
 int main()
 {
-	std::filesystem::create_directories("cognex-data");
+	const char* home = std::getenv("HOME");
+	if(!home)
+	{
+		throw std::runtime_error("HOME environment variable not set");
+	}
 
-	Cognex db(WalPath{"cognex-data/data/wal.log"},SnapshotPath{"cognex-data/data/snapshot.dat"});
+	std::filesystem::path base = std::filesystem::path(home) / ".cognex";
+
+	std::filesystem::create_directories(base);
+	Cognex db(WalPath{(base/"wal.log").string()},SnapshotPath{(base/"snapshot.dat").string()});
+	
 	db.recover();
-
 	run_repl(db);
 	return 0;
 }
