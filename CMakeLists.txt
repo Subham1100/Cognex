@@ -16,6 +16,9 @@ add_executable(cognex
     engine/src/snapshot.cpp
 )
 
+install(TARGETS cognex DESTINATION bin)
+
+
 target_include_directories(cognex
     PRIVATE
         engine/include
