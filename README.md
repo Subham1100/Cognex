@@ -53,28 +53,28 @@ Alice
 
 ## This directory contains:
 
--Write-ahead log files
--Snapshot files
--Metadata required for recovery
+- Write-ahead log files
+- Snapshot files
+- etadata required for recovery
 
 ## On startup, Cognex automatically:
 
--Loads the latest snapshot (if present)
--Replays the WAL
--Restores the database to a consistent state
+- Loads the latest snapshot (if present)
+- Replays the WAL
+- Restores the database to a consistent state
 
 ## Crash Safety & Recovery
 
--Every write is first recorded in the WAL
--Periodic snapshots reduce recovery time
--On crash or restart, Cognex guarantees no committed data is lost
+- Every write is first recorded in the WAL
+- Periodic snapshots reduce recovery time
+- On crash or restart, Cognex guarantees no committed data is lost
 
 ## Build Requirements
 
 To build Cognex from source, you need:
 
--CMake ≥ 3.16
--A C++17-compatible compiler (gcc / clang)
+- CMake ≥ 3.16
+- A C++17-compatible compiler (gcc / clang)
 
 ## License
 MIT License
