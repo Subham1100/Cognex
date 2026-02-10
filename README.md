@@ -1,60 +1,80 @@
 # Cognex
 
-Cognex is a single-node, persistent key–value database built incrementally to understand real database internals such as durability, crash recovery, and storage invariants.
+Cognex is a **simple, persistent key–value database** written in C++.
 
-The project is developed **version by version**, with each version freezing a clear set of guarantees before moving forward.  
-Cognex prioritizes **correctness and clarity over performance**.
+It is built to explore **database internals** such as durability, crash recovery, and storage engines, using:
 
----
+- Write-Ahead Logging (WAL)
+- Periodic snapshots
+- A built-in interactive CLI (REPL)
 
-## Project Goals
-
-- Learn how real databases are built internally
-- Implement correctness before optimization
-- Evolve features incrementally with explicit guarantees
-- Keep the system simple, inspectable, and auditable
+Cognex is lightweight, crash-safe, and designed for learning, experimentation, and systems-level understanding.
 
 ---
 
-## Version Overview
+## Features
 
-| Version | Description |
-|------|------------|
-| v0 | In-memory key–value store |
-| v1 | Write-Ahead Log (WAL) with crash recovery |
-| v2 | Snapshots (checkpointing) and WAL truncation |
-| v3 (planned) | Concurrent reads and writes |
-
----
-
-## Cognex v2 — Snapshots & WAL Truncation
-
-Cognex v2 extends the durability guarantees of v1 by introducing **snapshots (checkpoints)**.  
-This makes recovery time and disk usage **bounded**, turning Cognex into a practical single-node storage engine.
+- Persistent key–value storage
+- Write-Ahead Log (WAL) for durability
+- Snapshot-based fast recovery
+- Interactive command-line interface (REPL)
+- Automatic data storage in `~/.cognex`
+- No runtime dependencies after installation
 
 ---
 
-## Why v2 Exists
+## Installation
 
-In v1, all writes were persisted using a Write-Ahead Log (WAL).  
-While correct, this approach had inherent limitations:
+### Option 1: One-line install (recommended)
 
-- WAL size grew indefinitely
-- Startup time increased linearly with WAL length
+```bash
+curl -fsSL https://raw.githubusercontent.com/Subham1100/Cognex/main/install.sh | bash
+```
 
-These are expected constraints of a WAL-only system.
+Option 2: Install from source (manual)
+```
+git clone https://github.com/Subham1100/Cognex.git
+cd Cognex
+chmod +x install.sh
+./install.sh
+```
 
-v2 solves this by introducing snapshotting.
+##Example Usage
 
----
+Inside the Cognex prompt:
+```
+> PUT name Alice
+[Sucess]
+> GET name
+Alice
+> DEL name
+[Sucess]
+```
 
-## Key Features in v2
+##This directory contains:
 
-### Snapshots (Checkpointing)
+-Write-ahead log files
+-Snapshot files
+-Metadata required for recovery
 
-Cognex periodically writes the full in-memory state to disk as a snapshot.
+##On startup, Cognex automatically:
 
-- Represents a fully materialized database state
-- Independent of WAL history
-- Stored in a simple, human-readable format
+-Loads the latest snapshot (if present)
+-Replays the WAL
+-Restores the database to a consistent state
 
+##Crash Safety & Recovery
+
+-Every write is first recorded in the WAL
+-Periodic snapshots reduce recovery time
+-On crash or restart, Cognex guarantees no committed data is lost
+
+##Build Requirements
+
+To build Cognex from source, you need:
+
+-CMake ≥ 3.16
+-A C++17-compatible compiler (gcc / clang)
+
+## License
+MIT License
