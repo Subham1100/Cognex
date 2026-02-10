@@ -30,7 +30,7 @@ Cognex is lightweight, crash-safe, and designed for learning, experimentation, a
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Subham1100/Cognex/main/install.sh | bash
 ```
-Run with : ./Cognex
+Run with : ./bin/Cognex
 
 Option 2: Install from source (manual)
 ```
@@ -39,7 +39,7 @@ cd Cognex
 chmod +x install.sh
 ./install.sh
 ```
-Run with : ./Cognex
+Run with : ./bin/Cognex
 
 ## Example Usage
 
@@ -51,6 +51,8 @@ Inside the Cognex prompt:
 Alice
 > DEL name
 [Sucess]
+> GET name
+[NIL]
 ```
 
 ## This directory contains:
