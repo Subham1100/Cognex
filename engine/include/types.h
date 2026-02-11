@@ -37,6 +37,20 @@ struct Value
 };
 
 
+struct Entry
+{
+    size_t id;
+    Key key;
+    Value value;
+    std::vector<std::string> tokens;
+
+    explicit Entry(ssize_t id_,Key key_, Value value_, std::vector<std::string>tokens_)
+    :id(id_),
+    key(std::move(key_)),
+    value(std::move(value_)),
+    tokens(std::move(tokens_)){}
+}
+
 // ---------- Hash specialization ----------
 
 namespace std {
