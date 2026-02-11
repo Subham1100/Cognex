@@ -47,7 +47,7 @@ void Cognex::put(Key key,Value value)
     store.insert_or_assign(
     std::move(key),
     std::move(value)
-);
+	);
 }
 
 bool Cognex::del(const Key& key)

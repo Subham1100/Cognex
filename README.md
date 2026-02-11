@@ -12,6 +12,8 @@ Cognex is lightweight, crash-safe, and designed for learning, experimentation, a
 
 ---
 
+ [Documentation](https://subham1100.github.io/Cognex/)
+
 ## Features
 
 - Persistent key–value storage
