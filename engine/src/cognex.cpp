@@ -9,7 +9,7 @@
 static std::unordered_map<Key,Value> store;
 //------------Secondary Storages-----------
 static std::vector<Entry> entries;
-static std::unordered_map<std::string,std::vector<size_t>> tokenIndex;
+static std::unordered_map<std::pair<std::string,size_t>,std::vector<Posting>> tokenIndex;
 
 //-------Helpers-------------
 static void apply_record (const std::string_view& record)
@@ -57,6 +57,7 @@ static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_vi
 	std::vector<std::string> tokenVector;
 	size_t startPointer = 0;
 	size_t valueLength = value.length();
+	size_t tokenNumber = 0;
 	while(startPointer<valueLength)
 	{
 		size_t endPointer = value.find(' ',startPointer);
@@ -67,11 +68,30 @@ static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_vi
 
         if(!token.empty())
         {
-        	tokenVector.push_back(token);
-        	tokenIndex[token].push_back(entryId);
+        	
+
+        	auto& postings = tokenIndex[token];
+        	// the idea is tokens will be aligned for all new entries but modification
+        	// updates on PUT still is an issue.
+
+        	if(!postings.empty() && (postings.back().entryId == entryId))
+        	{
+        		postings.back().frequency++;
+        		postings.back().tokenPositions.push_back(tokenNumber);
+        	}
+        	else
+        	{
+        		//Posting has a constructor, so it's NOT an aggregate.
+        		postings.emplace_back(entryId,1,std::vector<size_t>{tokenNumber} );
+        	}
+
+        	tokenVector.push_back(std::move(token));
+        	tokenNumber++;
+
         }
         startPointer = endPointer + 1;
 	}
+	
 	return tokenVector;
 }
 

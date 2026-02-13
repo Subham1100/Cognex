@@ -44,11 +44,23 @@ struct Entry
     Value value;
     std::vector<std::string> tokens;
 
-    explicit Entry(ssize_t id_,Key key_, Value value_, std::vector<std::string>tokens_)
+    explicit Entry(size_t id_,Key key_, Value value_, std::vector<std::string>tokens_)
     :id(id_),
     key(std::move(key_)),
     value(std::move(value_)),
     tokens(std::move(tokens_)){}
+};
+
+struct Posting
+{
+    size_t entryId;
+    size_t frequency;
+    std::vector<size_t> tokenPositions;
+
+    explicit Posting(size_t entryId_, size_t frequency_, std::vector<size_t> tokenPositions_)
+    :entryId(entryId_),
+    frequency(frequency_),
+    tokenPositions(tokenPositions_) {}
 };
 
 // ---------- Hash specialization ----------
