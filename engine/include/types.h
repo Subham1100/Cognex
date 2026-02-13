@@ -49,7 +49,7 @@ struct Entry
     key(std::move(key_)),
     value(std::move(value_)),
     tokens(std::move(tokens_)){}
-}
+};
 
 // ---------- Hash specialization ----------
 

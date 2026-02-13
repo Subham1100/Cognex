@@ -19,13 +19,13 @@ void run_repl(Cognex& db)
     std::string line;
     int write_count = 0;
     constexpr int SNAPSHOT_THRESHOLD = 5;
-
+   
     std::cout << "cognex> ";
 
     while (std::getline(std::cin, line))
     {
+        
         std::string_view sv(line);
-
         // Trim leading spaces
         while (!sv.empty() && sv.front() == ' ')
             sv.remove_prefix(1);
@@ -34,54 +34,145 @@ void run_repl(Cognex& db)
             std::cout << "cognex> ";
             continue;
         }
-
+        // std::cout<<sv<<"\n";
         // Parse command
-        size_t p1 = sv.find(' ');
+        size_t p1 = sv.find("(\"");
         std::string_view cmd =
             (p1 == std::string_view::npos) ? sv : sv.substr(0, p1);
 
+        while (!cmd.empty() && cmd.back() == ' ')
+            cmd.remove_suffix(1);
+
+         if (cmd.empty()) {
+            std::cout << "cognex> ";
+            continue;
+        }
+
+        
         std::string_view rest =
-            (p1 == std::string_view::npos) ? std::string_view{} : sv.substr(p1 + 1);
+            (p1 == std::string_view::npos) ? std::string_view{} : sv.substr(p1);
+
+            if (cmd.empty()) {
+            std::cout << "cognex> ";
+            continue;
+        }
 
         if (cmd == "PUT")
         {
-            size_t p2 = rest.find(' ');
-            if (p2 == std::string_view::npos) {
-                std::cout << "[ERR invalid PUT]\n";
-            } else {
-                std::string_view key = rest.substr(0, p2);
-                std::string_view val = rest.substr(p2 + 1);
+            size_t keyStart = rest.find("(\"");
+            if(keyStart==std::string_view::npos)
+            {
+                 std::cout << "[ERR invalid PUT]\n";
+                 std::cout << "cognex> ";
+                 continue;
+                 
+            }
+            std::cout<<rest[keyStart]<<"\n";
+            size_t keyEnd = rest.find("\")",keyStart);
+            if(keyEnd==std::string_view::npos || keyEnd <= keyStart + 1)
+            {
+                 std::cout << "[ERR invalid PUT]\n";
+                 std::cout << "cognex> ";
+                 continue;
+                 
+            }
+            std::cout<<rest[keyEnd]<<"\n";
+            std::string_view keyString = rest.substr(keyStart + 2 , keyEnd- (keyStart+2));
+            std::cout<<keyString<<"\n";
 
-                if (key.empty() || val.empty()) {
+            size_t valueStart = rest.find("(\"",keyEnd);
+            if(valueStart==std::string_view::npos)
+            {
+                 std::cout << "[ERR invalid PUT]\n";
+                 std::cout << "cognex> ";
+                 continue;
+                 
+            }
+
+            size_t valueEnd = rest.find("\")",valueStart);
+            if(valueEnd==std::string_view::npos || valueEnd <= valueStart + 1)
+            {
+                 std::cout << "[ERR invalid PUT]\n";
+                 std::cout << "cognex> ";
+                 continue;
+                 
+            }
+            std::string_view valueString = rest.substr(valueStart + 2,valueEnd - (valueStart + 2));
+            std::cout<<valueString<<"\n";
+            if (keyString.empty() || valueString.empty()) {
                     std::cout << "[ERR invalid PUT]\n";
+                    std::cout << "cognex> ";
+                    continue;
+                    
                 } else {
+                    
                     db.put(
-                        Key{std::string(key)},
-                        Value{std::string(val)}
+                        Key{std::string(keyString)},
+                        Value{std::string(valueString)}
                     );
                     write_count++;
                     std::cout << "[Success]\n";
                 }
-            }
+            
         }
         else if (cmd == "GET")
         {
-            if (rest.empty()) {
+            size_t keyStart = rest.find("(\"");
+            if(keyStart==std::string_view::npos)
+            {
+                 std::cout << "[ERR invalid GET]\n";
+                 std::cout << "cognex> ";
+                 continue;
+                 
+            }
+            size_t keyEnd = rest.find("\")",keyStart);
+            if(keyEnd==std::string_view::npos)
+            {
+                 std::cout << "[ERR invalid GET]\n";
+                 std::cout << "cognex> ";
+                 continue;
+                 
+            }
+            std::string_view keyString = rest.substr(keyStart+2, keyEnd- (keyStart+2));
+            if (keyString.empty()) {
                 std::cout << "[ERR invalid GET]\n";
+                std::cout << "cognex> ";
+                continue;
+                
             } else {
-                auto v = db.get(Key{std::string(rest)});
-                if (v)
-                    std::cout << v->value << "\n";
-                else
+                auto v = db.get(Key{std::string(keyString)});
+                if (v){
+                        std::cout << v->value << "\n";
+                    }
+                else{
                     std::cout << "[NIL]\n";
+                }
             }
         }
         else if (cmd == "DEL")
         {
-            if (rest.empty()) {
+            size_t keyStart = rest.find("(\"");
+            if(keyStart==std::string_view::npos)
+            {
+                 std::cout << "[ERR invalid DEL]\n";
+                 std::cout << "cognex> ";
+                 continue;
+            }
+            size_t keyEnd = rest.find("\")",keyStart);
+            if(keyEnd==std::string_view::npos)
+            {
+                 std::cout << "[ERR invalid DEL]\n";
+                 std::cout << "cognex> ";
+                 continue;
+            }
+            std::string_view keyString = rest.substr(keyStart+1, keyEnd- (keyStart+1));
+            if (keyString.empty()) {
                 std::cout << "[ERR invalid DEL]\n";
+                std::cout << "cognex> ";
+                continue;
+                
             } else {
-                if (db.del(Key{std::string(rest)})) {
+                if (db.del(Key{std::string(keyString)})) {
                     write_count++;
                     std::cout << "[Success]\n";
                 } else {
@@ -94,10 +185,12 @@ void run_repl(Cognex& db)
             db.snapshot();
             write_count = 0;
             std::cout << "[Success]\n";
+
         }
         else if (cmd == "HELP")
         {
             print_help();
+
         }
         else if (cmd == "EXIT")
         {
@@ -106,6 +199,8 @@ void run_repl(Cognex& db)
         else
         {
             std::cout << "[ERR unknown command]\n";
+            std::cout << "cognex> ";
+            continue;
         }
 
         if (write_count >= SNAPSHOT_THRESHOLD)

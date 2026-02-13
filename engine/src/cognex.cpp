@@ -5,7 +5,11 @@
 #include <unordered_map>
 #include <string_view>
 
+//------------Main DB----------- 
 static std::unordered_map<Key,Value> store;
+//------------Secondary Storages-----------
+static std::vector<Entry> entries;
+static std::unordered_map<std::string,std::vector<size_t>> tokenIndex;
 
 static void apply_record (const std::string_view& record)
 {
@@ -48,6 +52,8 @@ void Cognex::put(Key key,Value value)
     std::move(key),
     std::move(value)
 	);
+    
+
 }
 
 bool Cognex::del(const Key& key)
