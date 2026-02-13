@@ -11,6 +11,7 @@ static std::unordered_map<Key,Value> store;
 static std::vector<Entry> entries;
 static std::unordered_map<std::string,std::vector<size_t>> tokenIndex;
 
+//-------Helpers-------------
 static void apply_record (const std::string_view& record)
 {
 	size_t p1 = record.find(' ');
@@ -36,6 +37,57 @@ static void apply_record (const std::string_view& record)
 	}
 }
 
+static std::string clean_token(std::string token)
+{
+    // Remove leading whitespace
+    size_t start = 0;
+    while (start < token.size() && std::isspace(static_cast<unsigned char>(token[start])))
+        ++start;
+
+    // Remove trailing whitespace
+    size_t end = token.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(token[end - 1])))
+        --end;
+
+    return token.substr(start, end - start);
+}
+
+static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_view value, size_t entryId)
+{
+	std::vector<std::string> tokenVector;
+	size_t startPointer = 0;
+	size_t valueLength = value.length();
+	while(startPointer<valueLength)
+	{
+		size_t endPointer = value.find(' ',startPointer);
+		if(endPointer == std::string_view::npos)
+			endPointer=value.length();
+		std::string token(value.substr(startPointer, endPointer - startPointer));
+        token = clean_token(token);
+
+        if(!token.empty())
+        {
+        	tokenVector.push_back(token);
+        	tokenIndex[token].push_back(entryId);
+        }
+        startPointer = endPointer + 1;
+	}
+	return tokenVector;
+}
+
+static void push_entry(Key key, Value value)
+{
+	Entry entry;
+    entry.id = entries.size();
+    entry.key = std::move(key);
+    entry.value = std::move(value);
+    entry.tokens = generate_tokens_update_tokenIndex(std::string_view(entry.value.value),entry.id);
+    entries.push_back(std::move(entry));
+}
+
+
+//-------------Engine-------------
+
 Cognex::Cognex(WalPath wal_path,SnapshotPath snapshot_path
 	):wal_path_(std::move(wal_path)),snapshot_path_(std::move(snapshot_path)){}
 
@@ -52,7 +104,9 @@ void Cognex::put(Key key,Value value)
     std::move(key),
     std::move(value)
 	);
+	push_entry(key, value);
     
+
 
 }
 

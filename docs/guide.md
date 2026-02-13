@@ -29,8 +29,8 @@ Stores a value under the specified key.
 
 **Example**
 
-PUT name Alice
-PUT age 20
+PUT ("name") ("Alice")
+PUT ("age") ("20")
 
 
 ---
@@ -44,7 +44,7 @@ Retrieves the value associated with a key.
 
 **Example**
 
-GET name
+GET ("name")
 
 **Output**
 
@@ -61,7 +61,7 @@ Deletes a key and its value from storage.
 
 **Example**
 
-DEL age
+DEL ("age")
 
 
 ---

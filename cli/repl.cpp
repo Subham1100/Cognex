@@ -165,7 +165,7 @@ void run_repl(Cognex& db)
                  std::cout << "cognex> ";
                  continue;
             }
-            std::string_view keyString = rest.substr(keyStart+1, keyEnd- (keyStart+1));
+            std::string_view keyString = rest.substr(keyStart+ 2, keyEnd- (keyStart+2));
             if (keyString.empty()) {
                 std::cout << "[ERR invalid DEL]\n";
                 std::cout << "cognex> ";
