@@ -126,8 +126,6 @@ void Cognex::put(Key key,Value value)
 	);
 	push_entry(key, value);
     
-
-
 }
 
 bool Cognex::del(const Key& key)
