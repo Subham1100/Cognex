@@ -34,7 +34,6 @@ void run_repl(Cognex& db)
             std::cout << "cognex> ";
             continue;
         }
-        // std::cout<<sv<<"\n";
         // Parse command
         size_t p1 = sv.find("(\"");
         std::string_view cmd =
@@ -67,7 +66,6 @@ void run_repl(Cognex& db)
                  continue;
                  
             }
-            std::cout<<rest[keyStart]<<"\n";
             size_t keyEnd = rest.find("\")",keyStart);
             if(keyEnd==std::string_view::npos || keyEnd <= keyStart + 1)
             {
@@ -76,9 +74,7 @@ void run_repl(Cognex& db)
                  continue;
                  
             }
-            std::cout<<rest[keyEnd]<<"\n";
             std::string_view keyString = rest.substr(keyStart + 2 , keyEnd- (keyStart+2));
-            std::cout<<keyString<<"\n";
 
             size_t valueStart = rest.find("(\"",keyEnd);
             if(valueStart==std::string_view::npos)
@@ -98,7 +94,7 @@ void run_repl(Cognex& db)
                  
             }
             std::string_view valueString = rest.substr(valueStart + 2,valueEnd - (valueStart + 2));
-            std::cout<<valueString<<"\n";
+
             if (keyString.empty() || valueString.empty()) {
                     std::cout << "[ERR invalid PUT]\n";
                     std::cout << "cognex> ";

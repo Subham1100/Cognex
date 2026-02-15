@@ -7,13 +7,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find zlib (for WAL CRC)
 find_package(ZLIB REQUIRED)
 
-add_executable(cognex
-    cli/main.cpp
-    cli/repl.cpp
+file(GLOB CLI_SOURCES cli/*.cpp)
+file(GLOB ENGINE_SOURCES engine/src/*.cpp)
 
-    engine/src/cognex.cpp
-    engine/src/wal.cpp
-    engine/src/snapshot.cpp
+add_executable(cognex
+    ${CLI_SOURCES}
+    ${ENGINE_SOURCES}
 )
 
 install(TARGETS cognex DESTINATION bin)
@@ -24,6 +23,12 @@ target_include_directories(cognex
         engine/include
         cli
 )
+
+target_compile_definitions(cognex
+    PRIVATE
+        COGNEX_DEBUG=1
+)
+
 
 target_link_libraries(cognex
     PRIVATE

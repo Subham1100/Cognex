@@ -1,6 +1,7 @@
 #include "cognex.h"
 #include "wal.h"
 #include "snapshot.h"
+#include "debug.h"
 
 #include <unordered_map>
 #include <string_view>
@@ -9,7 +10,7 @@
 static std::unordered_map<Key,Value> store;
 //------------Secondary Storages-----------
 static std::vector<Entry> entries;
-static std::unordered_map<std::pair<std::string,size_t>,std::vector<Posting>> tokenIndex;
+static std::unordered_map<std::string,std::vector<Posting>> tokenIndex;
 
 //-------Helpers-------------
 static void apply_record (const std::string_view& record)
@@ -84,7 +85,7 @@ static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_vi
         		//Posting has a constructor, so it's NOT an aggregate.
         		postings.emplace_back(entryId,1,std::vector<size_t>{tokenNumber} );
         	}
-
+        	debug_posting_array(postings);
         	tokenVector.push_back(std::move(token));
         	tokenNumber++;
 
@@ -97,11 +98,8 @@ static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_vi
 
 static void push_entry(Key key, Value value)
 {
-	Entry entry;
-    entry.id = entries.size();
-    entry.key = std::move(key);
-    entry.value = std::move(value);
-    entry.tokens = generate_tokens_update_tokenIndex(std::string_view(entry.value.value),entry.id);
+	size_t currId = entries.size();
+	Entry entry {currId,key,value,generate_tokens_update_tokenIndex(std::string_view(value.value),currId)};
     entries.push_back(std::move(entry));
 }
 
