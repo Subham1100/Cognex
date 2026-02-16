@@ -24,6 +24,54 @@ Cognex is lightweight, crash-safe, and designed for learning, experimentation, a
 - No runtime dependencies after installation
 
 ---
+---
+
+## PUT Benchmark
+
+**Workload:**  
+Inserted **1,000,000 key–value pairs**
+
+| Metric | Value |
+|--------|--------|
+| Operations | 1,000,000 |
+| Total Time | 39.501 sec |
+| Throughput | **25,315.8 ops/sec** |
+
+---
+
+## GET Benchmark
+
+**Workload:**  
+Performed **1,000,000 random key lookups**
+
+| Metric | Value |
+|--------|--------|
+| Operations | 1,000,000 |
+| Total Time | 0.61 sec |
+| Throughput | **1,639,340 ops/sec** |
+
+---
+
+##  Mixed Benchmark (50% PUT / 50% GET)
+
+**Workload:**  
+Alternating PUT and GET operations
+
+| Metric | Value |
+|--------|--------|
+| Operations | 1,000,000 |
+| Total Time | 19.174 sec |
+| Throughput | **52,154 ops/sec** |
+
+---
+
+##  Observations
+
+- **PUT performance** is significantly slower due to WAL writes and persistence overhead.
+- **GET operations** are extremely fast since values are currently served from memory.
+- Mixed workload reflects realistic usage patterns.
+
+---
 
 ## Installation
 
