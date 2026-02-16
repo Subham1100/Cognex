@@ -2,6 +2,7 @@
 
 void debug_posting_array(std::vector<Posting>& postings)
 {
+	    std::cout << "DEBUG FUNCTION CALLED\n";
 	for(const auto& posting : postings)
 	{
 		std::cout<<posting.entryId<<"\n"<<posting.frequency<<"\n";

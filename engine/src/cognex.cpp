@@ -55,12 +55,14 @@ static std::string clean_token(std::string token)
 
 static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_view value, size_t entryId)
 {
+	std::cout<<value<<"\n";
 	std::vector<std::string> tokenVector;
 	size_t startPointer = 0;
 	size_t valueLength = value.length();
 	size_t tokenNumber = 0;
 	while(startPointer<valueLength)
 	{
+		std::cout<<"inside loop 1";
 		size_t endPointer = value.find(' ',startPointer);
 		if(endPointer == std::string_view::npos)
 			endPointer=value.length();
@@ -70,7 +72,7 @@ static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_vi
         if(!token.empty())
         {
         	
-
+        	std::cout<<"inside loop 2";
         	auto& postings = tokenIndex[token];
         	// the idea is tokens will be aligned for all new entries but modification
         	// updates on PUT still is an issue.
@@ -85,6 +87,7 @@ static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_vi
         		//Posting has a constructor, so it's NOT an aggregate.
         		postings.emplace_back(entryId,1,std::vector<size_t>{tokenNumber} );
         	}
+        	std::cout<<"before debug_posting_array";
         	debug_posting_array(postings);
         	tokenVector.push_back(std::move(token));
         	tokenNumber++;
@@ -98,6 +101,7 @@ static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_vi
 
 static void push_entry(Key key, Value value)
 {
+	std::cout<<value.value<<"value at push_entry\n";
 	size_t currId = entries.size();
 	Entry entry {currId,key,value,generate_tokens_update_tokenIndex(std::string_view(value.value),currId)};
     entries.push_back(std::move(entry));
@@ -118,12 +122,12 @@ void Cognex::recover()
 void Cognex::put(Key key,Value value)
 {
 	append_and_fsync(wal_path_,"PUT " + key.value + " "+ value.value);
+	push_entry(key, value);
     store.insert_or_assign(
     std::move(key),
     std::move(value)
 	);
-	push_entry(key, value);
-    
+	
 }
 
 bool Cognex::del(const Key& key)
