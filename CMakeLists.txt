@@ -9,10 +9,12 @@ find_package(ZLIB REQUIRED)
 
 file(GLOB CLI_SOURCES cli/*.cpp)
 file(GLOB ENGINE_SOURCES engine/src/*.cpp)
+file(GLOB BENCH_SOURCES bench/*.cpp)
 
 add_executable(cognex
     ${CLI_SOURCES}
     ${ENGINE_SOURCES}
+    ${BENCH_SOURCES}
 )
 
 install(TARGETS cognex DESTINATION bin)
@@ -26,7 +28,7 @@ target_include_directories(cognex
 
 target_compile_definitions(cognex
     PRIVATE
-        COGNEX_DEBUG=1
+        COGNEX_DEBUG=0
 )
 
 

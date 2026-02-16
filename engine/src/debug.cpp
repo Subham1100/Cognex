@@ -2,6 +2,8 @@
 
 void debug_posting_array(std::vector<Posting>& postings)
 {
+	#if COGNEX_DEBUG
+
 	for(const auto& posting : postings)
 	{
 		std::cout<<posting.entryId<<"\n"<<posting.frequency<<"\n";
@@ -13,5 +15,6 @@ void debug_posting_array(std::vector<Posting>& postings)
 		std::cout << "----------------\n";
 		std::cout<<"\n\n";
 	}
+	#endif
 }
 

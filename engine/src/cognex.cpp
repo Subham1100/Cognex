@@ -12,6 +12,7 @@ static std::unordered_map<Key,Value> store;
 static std::vector<Entry> entries;
 static std::unordered_map<std::string,std::vector<Posting>> tokenIndex;
 
+
 //-------Helpers-------------
 static void apply_record (const std::string_view& record)
 {
@@ -84,7 +85,7 @@ static std::vector<std::string> generate_tokens_update_tokenIndex(std::string_vi
         		//Posting has a constructor, so it's NOT an aggregate.
         		postings.emplace_back(entryId,1,std::vector<size_t>{tokenNumber} );
         	}
-        	debug_posting_array(postings);
+
         	tokenVector.push_back(std::move(token));
         	tokenNumber++;
 

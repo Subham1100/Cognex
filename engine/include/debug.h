@@ -3,7 +3,7 @@
 #include "types.h"
 
 #ifndef COGNEX_DEBUG
-#define COGNEX_DEBUG 1
+#define COGNEX_DEBUG 0
 #endif
 
 #if COGNEX_DEBUG

@@ -11,6 +11,9 @@
   - [WAL](/wal.md)
   - [Snapshotting](/snapshot.md)
 
+- Benchmarks
+  - [v2.5 tokenisation](/v2.5.md)
+
 - Reference
   - [API](/api.md)
   - [Classes](/classes.md)
