@@ -12,7 +12,7 @@
   - [Snapshotting](/snapshot.md)
 
 - Benchmarks
-  - [v2.5 tokenisation](/v2.5.md)
+  - [v3.0 tokenisation](/v3.md)
 
 - Reference
   - [API](/api.md)
