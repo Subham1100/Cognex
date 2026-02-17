@@ -63,6 +63,12 @@ struct Posting
     tokenPositions(tokenPositions_) {}
 };
 
+struct Index
+{
+    size_t offset;
+    size_t valueSize;
+};
+
 // ---------- Hash specialization ----------
 
 namespace std {

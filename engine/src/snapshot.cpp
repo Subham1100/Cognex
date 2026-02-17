@@ -17,7 +17,7 @@ static std::string parent_dir(const std::string& path)
 
 void write_snapshot_atomic(
 	const SnapshotPath& path,
-	const std::unordered_map<Key, Value>& store
+	const std::unordered_map<Key, Value>& store_
 	)
 {
 	std::string tmp = path.value + ".tmp";
@@ -29,7 +29,7 @@ void write_snapshot_atomic(
 	}
 
 	// 2. Write snapshot contents
-	for(const auto& [k,v]: store)
+	for(const auto& [k,v]: store_)
 	{
 		std::string line = k.value + "=" + v.value + "\n";
 		if(write(fd,line.data(),line.size())!= (ssize_t)line.size())
@@ -69,7 +69,7 @@ void write_snapshot_atomic(
 
 void load_snapshot(
 	const SnapshotPath& path,
-	 std::unordered_map<Key, Value>& store
+	 std::unordered_map<Key, Value>& store_
 	)
 {
 
@@ -101,7 +101,7 @@ void load_snapshot(
     Key key{ line.substr(0, eq) };
     Value value{ line.substr(eq + 1) };
 
-    store.insert_or_assign(
+    store_.insert_or_assign(
         std::move(key),
         std::move(value)
     );
