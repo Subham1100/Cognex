@@ -128,6 +128,21 @@ bool Cognex::del(const Key& key)
     return store_.erase(key) > 0;
 }
 
+std::vector<EntryId> Cognex::query(const std::string_view& token) const
+{
+    std::vector<EntryId> results;
+
+    auto it = tokenIndex_.find(std::string(token));
+    if (it == tokenIndex_.end())
+        return results;
+
+    for (const auto& posting : it->second)
+        results.push_back(posting.entryId);
+
+    return results;
+}
+
+
 std::optional<Value> Cognex::get(const Key& key) const{
 
 	auto it = store_.find(key);
@@ -140,3 +155,4 @@ void Cognex::snapshot()
 	write_snapshot_atomic(snapshot_path_,store_);
 	wal_truncate(wal_path_);
 }
+

@@ -30,6 +30,11 @@ struct Key
     }
 };
 
+struct ParsedCommand {
+    std::string name;
+    std::vector<std::string> args;
+};
+
 struct Value
 {
     std::string value;

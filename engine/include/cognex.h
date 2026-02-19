@@ -15,6 +15,7 @@ public:
 	void put(Key key, Value value) override;
 	std::optional<Value> get(const Key& key) const override;
 	bool del(const Key& key) override;
+	std::vector<EntryId> query(const std::string_view& token) const;
 
 
 
@@ -26,13 +27,18 @@ public:
 private:
 	WalPath wal_path_;
 	SnapshotPath snapshot_path_;
+
 	//------------Main DB----------- 
+
 	std::unordered_map<Key,Value> store_;
-//------------Secondary Storages-----------
+
+	//------------Secondary Storages-----------
+
 	std::vector<Entry> entries_;
 	std::unordered_map<std::string,std::vector<Posting>> tokenIndex_;
 
-		//------------Helpers-----------	
+	//------------Helpers-----------
+
 	void apply_record_(const std::string_view& record);
     std::vector<std::string> generate_tokens_update_tokenIndex_(std::string_view value, size_t entryId);
     void push_entry_(Key key, Value value);

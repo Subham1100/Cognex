@@ -176,6 +176,26 @@ void run_repl(Cognex& db)
                 }
             }
         }
+        else if (cmd == "QUERY")
+        {
+            size_t keyStart = rest.find("(\"");
+            if(keyStart==std::string_view::npos)
+            {
+                 std::cout << "[ERR invalid DEL]\n";
+                 std::cout << "cognex> ";
+                 continue;
+            }
+            size_t keyEnd = rest.find("\")",keyStart);
+            if(keyEnd==std::string_view::npos)
+            {
+                 std::cout << "[ERR invalid DEL]\n";
+                 std::cout << "cognex> ";
+                 continue;
+            }
+            std::string_view keyString = rest.substr(keyStart+ 2, keyEnd- (keyStart+2));
+            
+
+        }
         else if (cmd == "SNAPSHOT")
         {
             db.snapshot();
