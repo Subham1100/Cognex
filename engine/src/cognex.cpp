@@ -128,9 +128,9 @@ bool Cognex::del(const Key& key)
     return store_.erase(key) > 0;
 }
 
-std::vector<EntryId> Cognex::query(const std::string_view& token) const
+std::vector<size_t> Cognex::query(const std::string_view& token) const
 {
-    std::vector<EntryId> results;
+    std::vector<size_t> results;
 
     auto it = tokenIndex_.find(std::string(token));
     if (it == tokenIndex_.end())

@@ -13,11 +13,11 @@ std::optional<ParsedCommand> parse_line(std::string_view sv)
         }
 // Parse command
     size_t p1 = sv.find("(\"");
-    std::string cmd = (p1 == std::string_view::npos) ? sv : sv.substr(0, p1);
+    std::string cmd = (p1 == std::string_view::npos) ? std::string(sv) : std::string(sv.substr(0, p1));
 
 //remove tailing whitespace
     while (!cmd.empty() && cmd.back() == ' ')
-        md.pop_back();
+        cmd.pop_back();
 
 
     if (cmd.empty()) {
@@ -41,7 +41,7 @@ std::optional<ParsedCommand> parse_line(std::string_view sv)
                  return result;
                  
             }
-            std::string keyString = rest.substr(keyStart + 2 , keyEnd- (keyStart+2));
+            std::string keyString = std::string(rest.substr(keyStart + 2 , keyEnd- (keyStart+2)));
 
 //push key to result args vector
 
@@ -62,7 +62,7 @@ std::optional<ParsedCommand> parse_line(std::string_view sv)
 
 //push value to result args vector
 
-            std::string valueString = rest.substr(valueStart + 2,valueEnd - (valueStart + 2));
+            std::string valueString = std::string(rest.substr(valueStart + 2,valueEnd - (valueStart + 2)));
 
             result.args.push_back(valueString);
 

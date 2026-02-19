@@ -15,9 +15,7 @@ public:
 	void put(Key key, Value value) override;
 	std::optional<Value> get(const Key& key) const override;
 	bool del(const Key& key) override;
-	std::vector<EntryId> query(const std::string_view& token) const;
-
-
+	std::vector<size_t> query(const std::string_view& token) const;
 
     //------------Recovery-----------	
 

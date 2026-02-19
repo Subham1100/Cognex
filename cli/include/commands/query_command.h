@@ -1,7 +1,7 @@
 #pragma once
 #include "commands/ICommand.h"
 
-class DelCommand : public ICommand {
+class QueryCommand : public ICommand {
 public:
     void execute(Cognex& db,
                  const std::vector<std::string>& args,
