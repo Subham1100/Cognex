@@ -33,7 +33,7 @@ private:
 	//------------Secondary Storages-----------
 
 	std::vector<Entry> entries_;
-	std::unordered_map<std::string,std::vector<Posting>> tokenIndex_;
+	std::unordered_map<std::string,std::vector<Posting>,std::string_view,std::equal_to<>> tokenIndex_;
 
 	//------------Helpers-----------
 
