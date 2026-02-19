@@ -1,93 +1,140 @@
-// #include <iostream>
-// #include <chrono>
-// #include <vector>
-// #include <random>
-// #include "cognex.h"
+#include <iostream>
+#include <chrono>
+#include <vector>
+#include <random>
+#include "cognex.h"
 
-// using Clock = std::chrono::high_resolution_clock;
+using Clock = std::chrono::high_resolution_clock;
 
-// static const int N = 1'000'000;
+static const int N = 1'000'000;
 
-// void run_put_benchmark(Cognex& db) {
-//     std::cout << "\n=== PUT Benchmark ===\n";
+std::string number_to_spaced_digits(int n) {
+    std::string s = std::to_string(n);
+    std::string result;
 
-//     auto start = Clock::now();
+    for (char c : s) {
+        result += c;
+        result += ' ';
+    }
 
-//     for (int i = 0; i < N; i++) {
-//         db.put(Key{"key" + std::to_string(i)},
-//                Value{"value" + std::to_string(i)});
-//     }
+    if (!result.empty())
+        result.pop_back(); // remove trailing space
 
-//     auto end = Clock::now();
+    return result;
+}
 
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
+void run_put_benchmark(Cognex& db) {
+    std::cout << "\n=== PUT Benchmark ===\n";
 
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
-// }
+    auto start = Clock::now();
 
-// void run_get_benchmark(Cognex& db) {
-//     std::cout << "\n=== GET Benchmark ===\n";
+    for (int i = 0; i < N; i++) {
 
-//     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> dist(0, N - 1);
+        std::string value = number_to_spaced_digits(i);
 
-//     auto start = Clock::now();
+        db.put(
+            Key{"key" + std::to_string(i)},
+            Value{value}
+        );
+    }
 
-//     for (int i = 0; i < N; i++) {
-//         int k = dist(rng);
-//         db.get(Key{"key" + std::to_string(k)});
-//     }
+    auto end = Clock::now();
 
-//     auto end = Clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    double seconds = duration.count() / 1000.0;
 
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
+    std::cout << "Ops: " << N << "\n";
+    std::cout << "Time: " << seconds << " sec\n";
+    std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
+}
 
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
-// }
 
-// void run_mixed_benchmark(Cognex& db) {
-//     std::cout << "\n=== Mixed Benchmark (50% PUT / 50% GET) ===\n";
+void run_get_benchmark(Cognex& db) {
+    std::cout << "\n=== GET Benchmark ===\n";
 
-//     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> dist(0, N - 1);
+    std::mt19937 rng(42);
+    std::uniform_int_distribution<int> dist(0, N - 1);
 
-//     auto start = Clock::now();
+    auto start = Clock::now();
 
-//     for (int i = 0; i < N; i++) {
-//         if (i % 2 == 0) {
-//             db.put(Key{"key" + std::to_string(i)},
-//                Value{"value" + std::to_string(i)});
-//         } else {
-//             int k = dist(rng);
-//            db.get(Key{"key" + std::to_string(k)});
-//         }
-//     }
+    for (int i = 0; i < N; i++) {
+        int k = dist(rng);
+        db.get(Key{"key" + std::to_string(k)});
+    }
 
-//     auto end = Clock::now();
+    auto end = Clock::now();
 
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    double seconds = duration.count() / 1000.0;
 
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
-// }
+    std::cout << "Ops: " << N << "\n";
+    std::cout << "Time: " << seconds << " sec\n";
+    std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
+}
 
-// int main() {
-//     Cognex db(WalPath{"wal.log"},SnapshotPath{"snapshot.dat"});
+void run_mixed_benchmark(Cognex& db) {
+    std::cout << "\n=== Mixed Benchmark (50% PUT / 50% GET) ===\n";
 
-//     std::cout << "Starting Cognex Benchmarks...\n";
+    std::mt19937 rng(42);
+    std::uniform_int_distribution<int> dist(0, N - 1);
 
-//     run_put_benchmark(db);
-//     run_get_benchmark(db);
-//     run_mixed_benchmark(db);
+    auto start = Clock::now();
 
-//     std::cout << "\nBenchmarks complete.\n";
-//     return 0;
-// }
+    for (int i = 0; i < N; i++) {
+        if (i % 2 == 0) {
+            db.put(Key{"key" + std::to_string(i)},
+               Value{"value" + std::to_string(i)});
+        } else {
+            int k = dist(rng);
+           db.get(Key{"key" + std::to_string(k)});
+        }
+    }
+
+    auto end = Clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    double seconds = duration.count() / 1000.0;
+
+    std::cout << "Ops: " << N << "\n";
+    std::cout << "Time: " << seconds << " sec\n";
+    std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
+}
+void run_query_benchmark(Cognex& db) {
+    std::cout << "\n=== QUERY Benchmark ===\n";
+
+    std::mt19937 rng(42);
+    std::uniform_int_distribution<int> digit_dist(0, 9);
+
+    auto start = Clock::now();
+
+    for (int i = 0; i < 10; i++) {
+
+        int digit = digit_dist(rng);
+
+        db.query(std::to_string(digit));
+    }
+
+    auto end = Clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    double seconds = duration.count() / 1000.0;
+
+    std::cout << "Ops: " << N << "\n";
+    std::cout << "Time: " << seconds << " sec\n";
+    std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
+}
+
+
+
+int main() {
+    Cognex db(WalPath{"wal.log"},SnapshotPath{"snapshot.dat"});
+
+    std::cout << "Starting Cognex Benchmarks...\n";
+
+    run_put_benchmark(db);
+    run_get_benchmark(db);
+    run_mixed_benchmark(db);
+    run_query_benchmark(db);
+    std::cout << "\nBenchmarks complete.\n";
+    return 0;
+}

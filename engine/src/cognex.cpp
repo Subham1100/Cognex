@@ -132,7 +132,7 @@ std::vector<size_t> Cognex::query(const std::string_view& token) const
 {
     std::vector<size_t> results;
 
-    auto it = tokenIndex_.find(std::string(token));
+    auto it = tokenIndex_.find(token);
     if (it == tokenIndex_.end())
         return results;
 
