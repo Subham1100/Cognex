@@ -41,7 +41,6 @@ struct Value
     explicit Value(std::string v): value(std::move (v)) {}
 };
 
-
 struct Entry
 {
     size_t id;
@@ -67,6 +66,29 @@ struct Posting
     frequency(frequency_),
     tokenPositions(tokenPositions_) {}
 };
+
+struct TransparentHash {
+    using is_transparent = void;
+
+    size_t operator()(std::string_view sv) const {
+        return std::hash<std::string_view>{}(sv);
+    }
+
+    size_t operator()(const std::string& s) const {
+        return std::hash<std::string_view>{}(s);
+    }
+};
+
+struct TransparentEqual {
+    using is_transparent = void;
+
+    template<typename T, typename U>
+    bool operator()(const T& a, const U& b) const noexcept {
+        return a == b;
+    }
+};
+
+
 
 struct Index
 {
