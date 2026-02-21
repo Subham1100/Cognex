@@ -41,25 +41,26 @@ struct Value
     explicit Value(std::string v): value(std::move (v)) {}
 };
 
-struct Entry
+struct Entry // contains information about the PUT entry -> key,value,tokens
 {
-    size_t id;
+    size_t entryId;
     Key key;
     Value value;
     std::vector<std::string> tokens;
 
-    explicit Entry(size_t id_,Key key_, Value value_, std::vector<std::string>tokens_)
-    :id(id_),
+    explicit Entry(size_t entryId_,Key key_, Value value_, std::vector<std::string>tokens_)
+    :entryId(entryId_),
     key(std::move(key_)),
     value(std::move(value_)),
     tokens(std::move(tokens_)){}
 };
 
-struct Posting
+struct Posting // token -> entryId (keyValue)
 {
-    size_t entryId;
-    size_t frequency;
-    std::vector<size_t> tokenPositions;
+    // give you how many times a particular token appears in entryId (keyValue)
+    size_t entryId; // entryId of keyValue
+    size_t frequency; // how many times token appear
+    std::vector<size_t> tokenPositions; // at which positions it appears in keyValue
 
     explicit Posting(size_t entryId_, size_t frequency_, std::vector<size_t> tokenPositions_)
     :entryId(entryId_),

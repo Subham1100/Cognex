@@ -46,6 +46,10 @@ std::vector<std::string> Cognex::generate_tokens_update_tokenIndex_(std::string_
 	size_t tokenNumber = 0;
 	while(startPointer<valueLength)
 	{
+        while (startPointer < valueLength && value[startPointer] == ' ')
+        startPointer++;
+        if (startPointer >= valueLength)
+        break;
 		size_t endPointer = value.find(' ',startPointer);
 		if(endPointer == std::string_view::npos)
 			endPointer=value.length();
@@ -54,22 +58,29 @@ std::vector<std::string> Cognex::generate_tokens_update_tokenIndex_(std::string_
 
         if(!token.empty())
         {
-        	
-        	auto& postings = tokenIndex_[token];
-        	// the idea is tokens will be aligned for all new entries_ but modification
-        	// updates on PUT still is an issue.
+        	// find the token in tokenIndex
+        	auto& tokenPostings = tokenIndex_[token];
+            
+            // find the existing token posting related to the entryId 
+            // if entryId do not exists create a new posting id and push it to posting_ vector.
+            // then push the u_map <entryId,postingId> to tokeinIndex
 
-        	if(!postings.empty() && (postings.back().entryId == entryId))
-        	{
-        		postings.back().frequency++;
-        		postings.back().tokenPositions.push_back(tokenNumber);
-        	}
-        	else
-        	{
-        		//Posting has a constructor, so it's NOT an aggregate.
-        		postings.emplace_back(entryId,1,std::vector<size_t>{tokenNumber} );
-        	}
+            auto existingPosting = tokenPostings.find(entryId);
 
+            if( existingPosting ==tokenPostings.end())
+            {
+                size_t postingId = postings_.size();
+                postings_.emplace_back(entryId, 1, std::vector<size_t>{tokenNumber});
+                tokenPostings.emplace(entryId, postingId);            }
+            else
+            {
+                size_t postingId = existingPosting->second;
+
+                Posting& posting = postings_[postingId];
+
+                posting.frequency++;
+                posting.tokenPositions.push_back(tokenNumber);
+            }
         	tokenVector.push_back(std::move(token));
         	tokenNumber++;
 
@@ -136,8 +147,8 @@ std::vector<size_t> Cognex::query(const std::string_view& token) const
     if (it == tokenIndex_.end())
         return results;
 
-    for (const auto& posting : it->second)
-        results.push_back(posting.entryId);
+    for (const auto& tokenIndexPair : it->second)
+        results.push_back(tokenIndexPair.first);
 
     return results;
 }

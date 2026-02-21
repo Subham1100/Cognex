@@ -35,8 +35,9 @@ private:
 	//------------Secondary Storages-----------
 
 	std::vector<Entry> entries_;
-	std::unordered_map<std::string,std::vector<Posting>,TransparentHash,TransparentEqual> tokenIndex_;
-
+	//stores tokenIndex[token]->"Entry.entryId,Posting.postingId"
+	std::unordered_map<std::string,std::unordered_map<size_t,size_t>,TransparentHash,TransparentEqual> tokenIndex_;
+	std::vector<Posting> postings_;
 	//------------Helpers-----------
 
 	void apply_record_(const std::string_view& record);
