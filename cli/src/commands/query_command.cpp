@@ -11,7 +11,7 @@ void QueryCommand::execute(Cognex& db,
         return;
     }
 
-    std::vector<size_t> results = db.query(args[0]);
+    const std::vector<size_t>& results = db.query(std::string_view(args[0]));
 
     if (results.empty()) {
         std::cout << "[NIL]\n";

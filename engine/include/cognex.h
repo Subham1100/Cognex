@@ -17,8 +17,7 @@ public:
 	void put(Key key, Value value) override;
 	std::optional<Value> get(const Key& key) const override;
 	bool del(const Key& key) override;
-	std::vector<size_t> query(const std::string_view& token) const;
-
+	const std::vector<size_t>& query(std::string_view token) const;
     //------------Recovery-----------	
 
 	void recover() override;
@@ -35,8 +34,8 @@ private:
 	//------------Secondary Storages-----------
 
 	std::vector<Entry> entries_;
-	//stores tokenIndex[token]->"Entry.entryId,Posting.postingId"
-	std::unordered_map<std::string,std::unordered_map<size_t,size_t>,TransparentHash,TransparentEqual> tokenIndex_;
+	//stores tokenIndex[token]->"Entry.entryId"
+	std::unordered_map<std::string,std::vector<size_t>,TransparentHash,TransparentEqual> tokenIndex_;
 	std::vector<Posting> postings_;
 	//------------Helpers-----------
 
