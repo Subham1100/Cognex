@@ -44,6 +44,8 @@ std::vector<std::string> Cognex::generate_tokens_update_tokenIndex_(std::string_
 	size_t startPointer = 0;
 	size_t valueLength = value.length();
 	size_t tokenNumber = 0;
+    std::unordered_map<std::string,size_t> currEntryIdPostingHash;
+
 	while(startPointer<valueLength)
 	{
         while (startPointer < valueLength && value[startPointer] == ' ')
@@ -53,34 +55,29 @@ std::vector<std::string> Cognex::generate_tokens_update_tokenIndex_(std::string_
 		size_t endPointer = value.find(' ',startPointer);
 		if(endPointer == std::string_view::npos)
 			endPointer=value.length();
-		std::string token(value.substr(startPointer, endPointer - startPointer));
-        token = clean_token(std::string_view(token));
+		std::string token = clean_token(value.substr(startPointer, endPointer - startPointer));
 
         if(!token.empty())
         {
         	// find the token in tokenIndex
-        	auto& tokenPostings = tokenIndex_[token];
-            
+        	
+            auto existInCurrEntryIdPostingHash = currEntryIdPostingHash.find(token);
             // find the existing token posting related to the entryId 
-            // if entryId do not exists create a new posting id and push it to posting_ vector.
-            // then push the u_map <entryId,postingId> to tokeinIndex
-
-            auto existingPosting = tokenPostings.find(entryId);
-
-            if( existingPosting ==tokenPostings.end())
+            if(existInCurrEntryIdPostingHash == currEntryIdPostingHash.end())
             {
-                size_t postingId = postings_.size();
-                postings_.emplace_back(entryId, 1, std::vector<size_t>{tokenNumber});
-                tokenPostings.emplace(entryId, postingId);            }
-            else
-            {
-                size_t postingId = existingPosting->second;
-
-                Posting& posting = postings_[postingId];
-
-                posting.frequency++;
-                posting.tokenPositions.push_back(tokenNumber);
+                size_t postingIndex = postings_.size();
+                postings_.emplace_back(entryId, 1, std::vector<size_t>{});
+                postings_.back().tokenPositions.push_back(tokenNumber);
+                currEntryIdPostingHash.emplace(token,postingIndex);
+                tokenIndex_[token].emplace_back(entryId);
             }
+            else 
+            {
+                size_t postingIndex = existInCurrEntryIdPostingHash->second;
+                postings_[postingIndex].frequency++;
+                postings_[postingIndex].tokenPositions.emplace_back(tokenNumber);
+            }
+       
         	tokenVector.push_back(std::move(token));
         	tokenNumber++;
 
@@ -139,18 +136,17 @@ bool Cognex::del(const Key& key)
     return store_.erase(key) > 0;
 }
 
-std::vector<size_t> Cognex::query(const std::string_view& token) const
+const std::vector<size_t>& Cognex::query( std::string_view token) const
 {
-    std::vector<size_t> results;
+   
+   static const std::vector<size_t> empty;
 
     auto it = tokenIndex_.find(token);
+
     if (it == tokenIndex_.end())
-        return results;
+        return empty;
 
-    for (const auto& tokenIndexPair : it->second)
-        results.push_back(tokenIndexPair.first);
-
-    return results;
+    return it->second;
 }
 
 
