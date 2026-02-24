@@ -16,12 +16,13 @@ Cognex is lightweight, crash-safe, and designed for learning, experimentation, a
 
 ## Features
 
-- Persistent key–value storage
-- Write-Ahead Log (WAL) for durability
-- Snapshot-based fast recovery
-- Interactive command-line interface (REPL)
-- Automatic data storage in `~/.cognex`
-- No runtime dependencies after installation
+Persistent key–value storage
+Write-Ahead Log (WAL) for durability
+Snapshot-based fast recovery
+Interactive command-line interface (REPL)
+Token-based QUERY support (inverted index)
+Automatic data storage in ~/.cognex
+No runtime dependencies after installation
 
 ---
 ---
@@ -95,14 +96,19 @@ Run with : ./bin/Cognex
 
 Inside the Cognex prompt:
 ```
-> PUT name Alice
+> PUT ("name") ("Alice is good") ---> entry 0
+> PUT ("name") ("Bob is good") -----> entry 1
 [Sucess]
-> GET name
-Alice
+> GET ("name")
+Alice is good
+> QUERY ("good")
+> 0
+> 1
 > DEL name
 [Sucess]
 > GET name
 [NIL]
+
 ```
 
 ## This directory contains:

@@ -5,6 +5,16 @@
 #include <stdexcept>
 #include <cstring>
 
+// Snapshot write_snapshot_atomic
+// -> key=offset,valueSize
+
+// load_snapshot
+// -> key
+// -> offset
+// -> valueSize
+
+// index_.load(key,entry)
+
 //Must fsync() the directory that contains the file you renamed.
 static std::string parent_dir(const std::string& path)
 {
@@ -17,7 +27,7 @@ static std::string parent_dir(const std::string& path)
 
 void write_snapshot_atomic(
 	const SnapshotPath& path,
-	const std::unordered_map<Key, Value>& store_
+	const std::unordered_map<Key, IndexEntry>& index_
 	)
 {
 	std::string tmp = path.value + ".tmp";
@@ -29,9 +39,14 @@ void write_snapshot_atomic(
 	}
 
 	// 2. Write snapshot contents
-	for(const auto& [k,v]: store_)
+	for(const auto& [k,i]: index_) //i is for indexEntry
 	{
-		std::string line = k.value + "=" + v.value + "\n";
+		std::string line =
+            k.value + "=" +
+            std::to_string(i.offset) + "," +
+            std::to_string(i.valueSize) + "\n";
+
+
 		if(write(fd,line.data(),line.size())!= (ssize_t)line.size())
 		{
 			close(fd);
@@ -69,7 +84,7 @@ void write_snapshot_atomic(
 
 void load_snapshot(
 	const SnapshotPath& path,
-	 std::unordered_map<Key, Value>& store_
+	 std::unordered_map<Key, IndexEntry>& index_
 	)
 {
 
@@ -80,9 +95,14 @@ void load_snapshot(
 	std::string content;
 
 	ssize_t n ;
-	while((n = read(fd,buf,sizeof(buf)))>0)
+	while ((n = read(fd, buf, sizeof(buf))) != 0)
 	{
-		content.append(buf,n);
+	    if (n < 0)
+	    {
+	        close(fd);
+	        throw std::runtime_error("snapshot read failed");
+	    }
+	    content.append(buf, n);
 	}
 
 	close(fd);
@@ -98,12 +118,23 @@ void load_snapshot(
     auto eq = line.find('=');
     if (eq == std::string::npos) continue;
 
-    Key key{ line.substr(0, eq) };
-    Value value{ line.substr(eq + 1) };
+    
+	auto comma = line.find(',', eq + 1);
+    if (comma == std::string::npos) continue;
 
-    store_.insert_or_assign(
+    std::string keyStr = line.substr(0, eq);
+    std::string offsetStr = line.substr(eq + 1, comma - (eq + 1));
+    std::string valueSizeStr = line.substr(comma + 1);
+
+    uint64_t offset = std::stoull(offsetStr);
+    uint32_t valueSize = static_cast<uint32_t>(std::stoul(valueSizeStr));
+    
+    Key key{ std::move(keyStr) };
+    IndexEntry entry{ offset, valueSize }; // offset and valueSize are primitive therefore no need for std::move
+
+    index_.insert_or_assign(
         std::move(key),
-        std::move(value)
+        entry
     );
 }
 
