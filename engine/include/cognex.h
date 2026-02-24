@@ -18,6 +18,8 @@ public:
 	std::optional<Value> get(const Key& key) const override;
 	bool del(const Key& key) override;
 	const std::vector<size_t>& query(std::string_view token) const;
+	uint64_t append_to_value_log_(uint32_t keySize, std::string_view value);
+	std::optional<Value> read_from_log_(uint64_t offset, uint32_t keySize) const;
     //------------Recovery-----------	
 
 	void recover() override;
@@ -29,7 +31,8 @@ private:
 
 	//------------Main DB----------- 
 
-	std::unordered_map<Key,Value> store_;
+	// std::unordered_map<Key,Value> store_;
+	std::unordered_map<Key, IndexEntry> index_;
 
 	//------------Secondary Storages-----------
 

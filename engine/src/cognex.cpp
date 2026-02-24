@@ -26,14 +26,26 @@ void Cognex::apply_record_(const std::string_view& record)
         Key key{std::string(key_sv)};
         Value value{std::string(value_sv)};
 
-        store_.insert_or_assign(std::move(key), std::move(value));
+        uint64_t offset = append_to_value_log_(
+            static_cast<uint32_t>(key.value.size()),
+            value.value
+        );
+
+         IndexEntry indexEntry {
+            offset,
+            static_cast<uint32_t>(value.value.size())
+        };
+
+        index_.insert_or_assign(std::move(key), indexEntry);
+
+        push_entry_(key, value);
     }
     else if (op == "DEL")
     {
         std::string_view key_sv = record.substr(p1 + 1);
 
         Key key{std::string(key_sv)};
-        store_.erase(key);
+        index_.erase(key);
     }
 }
 
@@ -112,15 +124,117 @@ void Cognex::recover()
         });
 }
 
+
+uint64_t Cognex::append_to_value_log_(uint32_t keySize, std::string_view value)
+{
+    // valueLog_.log -> header[[key_size][value_size]][value]
+
+        if (!valueLog_.is_open()) {
+
+            // Try normal open first
+            valueLog_.open("values.log",
+                           std::ios::in | // O_RDONLY
+                           std::ios::out | // O_WRONLY
+                           std::ios::binary |
+                           std::ios::app); // O_APPNED
+
+            // If failed → create file
+            if (!valueLog_) {
+                valueLog_.clear();  // reset error flags
+
+                // Create file
+                std::ofstream createFile("values.log",
+                                         std::ios::binary);
+                createFile.close();
+
+                // Reopen
+                valueLog_.open("values.log",
+                               std::ios::in |
+                               std::ios::out |
+                               std::ios::binary |
+                               std::ios::app);
+
+                if (!valueLog_) {
+                    throw std::runtime_error("Failed to create value log");
+                }
+            }
+        }
+
+        
+        valueLog_.clear();  // reset fail/eof flags -> This prevents mysterious “write stopped working” bugs.
+        // Move write pointer to end
+        valueLog_.seekp(0, std::ios::end);
+
+        // Capture offset
+        uint64_t offset = static_cast<uint64_t>(valueLog_.tellp());
+
+        //reader Header for later integrity check
+         RecordHeader header {
+        static_cast<uint32_t>(keySize),   
+        static_cast<uint32_t>(value.size())
+        };
+
+        // write header
+        valueLog_.write_all(reinterpret_cast<const char*>(&header), sizeof(header));
+        if (!valueLog_) throw std::runtime_error("Header write failed");
+
+        // write value
+        valueLog_.write_all(value.data(), header.valueSize);
+        if (!valueLog_) throw std::runtime_error("Value write failed");
+
+        valueLog_.flush(); // std::fstream buffer → OS page cache, on power loss data can be lost
+
+        return offset;
+}
+
+std::optional<Value> Cognex::read_from_log_(uint64_t offset, uint32_t keySize) const
+{
+    if (!valueLog_.is_open())
+        throw std::runtime_error("valueLog_ doesn't exixsts");
+
+    valueLog_.seekg(offset);
+
+    RecordHeader header;
+    valueLog_.read_all(reinterpret_cast<char*>(&header), sizeof(header));
+
+    if (!valueLog_) throw std::runtime_error("valueLog_ doesn't exixsts");
+
+    if (header.keySize != keySize)
+    {
+        throw std::runtime_error("Key size discrepancy detected");
+    }
+
+    std::string value(header.valueSize, '\0');
+    valueLog_.read_all(value.data(), header.valueSize);
+
+    if (!valueLog_) return std::nullopt;
+
+    return Value{std::move(value)};
+}
+
+
 void Cognex::put(Key key,Value value)
 {
+
+
 	append_and_fsync(wal_path_,"PUT " + key.value + " "+ value.value);
-	push_entry_(key, value);
-    store_.insert_or_assign(
-    std::move(key),
-    std::move(value)
-	);
 	
+    // store_.insert_or_assign(
+    // std::move(key),
+    // std::move(value)
+	// );
+        uint64_t offset = append_to_value_log_(static_cast<uint32_t>(key.value.size()),value.value);
+    IndexEntry indexEntry {
+    offset,
+    static_cast<uint32_t>(value.value.size())
+    };    
+    index_.insert_or_assign(key, indexEntry);
+	
+
+    push_entry_(key, value);// push entry should go after append_to_log: if crash 
+                            //after WAL the PUT will be there and no offset
+                            // WAL-> push_entry (can take time) -> offset (this can be missed)
+    
 }
 
 bool Cognex::del(const Key& key)
@@ -132,8 +246,10 @@ bool Cognex::del(const Key& key)
 	// store_.erase(key);
 	// return true;
 
-	append_and_fsync(wal_path_, "DEL " + key.value);
-    return store_.erase(key) > 0;
+    append_and_fsync(wal_path_, "DEL " + key.value);
+
+        // if we delete bytes from valueLog_.log offset indexing will change.
+     return index_.erase(key) > 0;
 }
 
 const std::vector<size_t>& Cognex::query( std::string_view token) const
@@ -152,9 +268,14 @@ const std::vector<size_t>& Cognex::query( std::string_view token) const
 
 std::optional<Value> Cognex::get(const Key& key) const{
 
-	auto it = store_.find(key);
-	if(it == store_.end()) return std::nullopt;
-	return it->second;
+	// auto it = store_.find(key);
+	// if(it == store_.end()) return std::nullopt;
+	// return it->second;
+
+    auto it = index_.find(key);
+    if(it == index_.end()) return std::nullopt;
+
+    return read_from_log_(it->second.offset, static_cast<uint32_t>(key.value.size()));
 }
 
 void Cognex::snapshot()
