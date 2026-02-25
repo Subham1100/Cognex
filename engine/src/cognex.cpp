@@ -160,7 +160,16 @@ uint64_t Cognex::append_to_value_log_(uint32_t keySize, std::string_view value)
     write_all(valueLogFd_, value.data(), value.size());
     write_all(valueLogFd_, &checksum, sizeof(checksum));
 
-    fsync(valueLogFd_);
+    valueLogWrites_++;
+    if(valueLogWrites_>=valueLogFsyncEveryNWrites_)
+    {
+         if(fsync(valueLogFd_)!=0)
+        {
+            throw std::runtime_error("fsync WAL error at append_to_value_log_");
+        }
+        valueLogWrites_=0;
+    }
+    
 
     return static_cast<uint64_t>(offset);
 }
@@ -216,7 +225,7 @@ void Cognex::put(Key key,Value value)
 {
 
 
-	append_and_fsync(wal_path_,"PUT " + key.value + " "+ value.value);
+	append_and_fsync(wal_path_,"PUT " + key.value + " "+ value.value, walWrites_, walFsyncEveryNWrites_);
 	
     // store_.insert_or_assign(
     // std::move(key),
@@ -227,13 +236,20 @@ void Cognex::put(Key key,Value value)
     offset,
     static_cast<uint32_t>(value.value.size())
     };    
-    index_.insert_or_assign(key, indexEntry);
+    
 	
 
     push_entry_(key, value);// push entry should go after append_to_log: if crash 
                             //after WAL the PUT will be there and no offset
                             // WAL-> push_entry (can take time) -> offset (this can be missed)
-    
+    index_.insert_or_assign(std::move(key), indexEntry);
+
+    snapshotWriteOps_++;
+    if(snapshotWriteOps_>=snapshotEveryNWriteOps_)
+    {
+        snapshot();
+        snapshotWriteOps_=0;
+    }
 }
 
 bool Cognex::del(const Key& key)
@@ -245,7 +261,7 @@ bool Cognex::del(const Key& key)
 	// store_.erase(key);
 	// return true;
 
-    append_and_fsync(wal_path_, "DEL " + key.value);
+    append_and_fsync(wal_path_, "DEL " + key.value, walWrites_,walFsyncEveryNWrites_);
 
         // if we delete bytes from valueLog_.log offset indexing will change.
      return index_.erase(key) > 0;

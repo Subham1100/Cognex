@@ -9,22 +9,31 @@
 #include <zlib.h>
 #include <utils.h>
 
-void append_and_fsync(const WalPath& path, const std::string& record)
+void append_and_fsync(const WalPath& path, const std::string& record, size_t& walWrites_,size_t& walFsyncEveryNWrites_)
 {
     int fd = open(path.value.c_str(),O_CREAT | O_WRONLY | O_APPEND, 0644);
-    if(fd<0)throw std::runtime_error("open WAL failed");
+        if (fd < 0)
+    {throw std::runtime_error( std::string("open WAL failed at ") + __func__);
+    }
 
-    uint32_t len = record.size();
+    uint32_t len = static_cast<uint32_t>(record.size());
     uint32_t checksum = crc32_str(record);
 
     write_all(fd,&len,sizeof(len));
     write_all(fd,record.data(),record.size());
     write_all(fd,&checksum,sizeof(checksum));
 
-    if(fsync(fd)!=0)
+    
+    walWrites_++;
+
+    if(walWrites_ >=walFsyncEveryNWrites_)
     {
-    	close(fd);
-    	throw std::runtime_error("fsync WAL error");
+        if(fsync(fd)!=0)
+        {
+            close(fd);
+            throw std::runtime_error(std::string("open WAL failed at ") + __func__);
+        }
+        walWrites_ = 0;
     }
     close(fd);
 }

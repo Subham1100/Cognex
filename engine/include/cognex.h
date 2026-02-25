@@ -47,6 +47,15 @@ private:
 	//------ file ------
 	int valueLogFd_ = -1;
 
+	//------ state vairables-----
+	size_t walWrites_ = 0;
+	size_t walFsyncEveryNWrites_ = 1000;
+
+	size_t valueLogWrites_ = 0;
+	size_t valueLogFsyncEveryNWrites_ = 5000;
+
+	size_t snapshotWriteOps_ = 0;
+	size_t snapshotEveryNWriteOps_ = 10000000;
 
 	//------------Helpers-----------
 
