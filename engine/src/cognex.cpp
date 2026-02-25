@@ -110,12 +110,12 @@ void Cognex::push_entry_(Key key, Value value)
 
 //-------------Engine-------------
 
-Cognex::Cognex(WalPath wal_path,SnapshotPath snapshot_path
-	):wal_path_(std::move(wal_path)),snapshot_path_(std::move(snapshot_path)){}
+Cognex::Cognex(WalPath wal_path,SnapshotPath snapshot_path,ValueLogPath valuelog_path
+	):wal_path_(std::move(wal_path)),snapshot_path_(std::move(snapshot_path)),valuelog_path_(std::move(valuelog_path)){}
 
 void Cognex::recover()
 {
-    load_snapshot(snapshot_path_, store_);
+    load_snapshot(snapshot_path_, index_);
 
     wal_replay(wal_path_,
         [this](std::string_view rec)
@@ -124,92 +124,91 @@ void Cognex::recover()
         });
 }
 
+void Cognex::open_value_log_if_needed_()
+{
+    if (valueLogFd_ != -1)
+        return;
+
+    valueLogFd_ = ::open(
+        valuelog_path_.value.c_str(),
+        O_RDWR | O_CREAT | O_APPEND,
+        0644
+    );
+
+    if (valueLogFd_ == -1)
+        throw std::runtime_error("Failed to open values.log");
+}
 
 uint64_t Cognex::append_to_value_log_(uint32_t keySize, std::string_view value)
 {
-    // valueLog_.log -> header[[key_size][value_size]][value]
+    // valueLog_.log -> header[[key_size][value_size]][value][checksum]
+    open_value_log_if_needed_();
 
-        if (!valueLog_.is_open()) {
+    off_t offset = lseek(valueLogFd_, 0, SEEK_END);
+    if (offset == -1)
+        throw std::runtime_error("lseek failed");
 
-            // Try normal open first
-            valueLog_.open("values.log",
-                           std::ios::in | // O_RDONLY
-                           std::ios::out | // O_WRONLY
-                           std::ios::binary |
-                           std::ios::app); // O_APPNED
-
-            // If failed → create file
-            if (!valueLog_) {
-                valueLog_.clear();  // reset error flags
-
-                // Create file
-                std::ofstream createFile("values.log",
-                                         std::ios::binary);
-                createFile.close();
-
-                // Reopen
-                valueLog_.open("values.log",
-                               std::ios::in |
-                               std::ios::out |
-                               std::ios::binary |
-                               std::ios::app);
-
-                if (!valueLog_) {
-                    throw std::runtime_error("Failed to create value log");
-                }
-            }
-        }
-
-        
-        valueLog_.clear();  // reset fail/eof flags -> This prevents mysterious “write stopped working” bugs.
-        // Move write pointer to end
-        valueLog_.seekp(0, std::ios::end);
-
-        // Capture offset
-        uint64_t offset = static_cast<uint64_t>(valueLog_.tellp());
-
-        //reader Header for later integrity check
-         RecordHeader header {
-        static_cast<uint32_t>(keySize),   
+    RecordHeader header {
+        keySize,
         static_cast<uint32_t>(value.size())
-        };
+    };
 
-        // write header
-        valueLog_.write_all(reinterpret_cast<const char*>(&header), sizeof(header));
-        if (!valueLog_) throw std::runtime_error("Header write failed");
+    uint32_t checksum = crc32_buf(&header, sizeof(header));
+    checksum = crc32_extend(checksum, value.data(), value.size());
 
-        // write value
-        valueLog_.write_all(value.data(), header.valueSize);
-        if (!valueLog_) throw std::runtime_error("Value write failed");
+    write_all(valueLogFd_, &header, sizeof(header));
+    write_all(valueLogFd_, value.data(), value.size());
+    write_all(valueLogFd_, &checksum, sizeof(checksum));
 
-        valueLog_.flush(); // std::fstream buffer → OS page cache, on power loss data can be lost
+    fsync(valueLogFd_);
 
-        return offset;
+    return static_cast<uint64_t>(offset);
 }
 
 std::optional<Value> Cognex::read_from_log_(uint64_t offset, uint32_t keySize) const
 {
-    if (!valueLog_.is_open())
-        throw std::runtime_error("valueLog_ doesn't exixsts");
+    if (valueLogFd_ == -1)
+        throw std::runtime_error("Value log not open");
+    // Seek to the PROVIDED offset (not end)
+    off_t pos = ::lseek(valueLogFd_, static_cast<off_t>(offset), SEEK_SET);
 
-    valueLog_.seekg(offset);
+
+    if (pos == -1)
+        throw std::runtime_error("lseek failed");
 
     RecordHeader header;
-    valueLog_.read_all(reinterpret_cast<char*>(&header), sizeof(header));
+    // Read header
+    // Use pread_all() to perform offset-based reads without modifying the
+    // shared file descriptor cursor. This prevents read/write interference.
+    pread_all(valueLogFd_, &header, sizeof(header),offset);
 
-    if (!valueLog_) throw std::runtime_error("valueLog_ doesn't exixsts");
-
+    // // Validate key size
     if (header.keySize != keySize)
-    {
         throw std::runtime_error("Key size discrepancy detected");
-    }
 
+        // Read value
     std::string value(header.valueSize, '\0');
-    valueLog_.read_all(value.data(), header.valueSize);
+        // Read value at precise offset
+    pread_all(valueLogFd_,
+              value.data(),
+              header.valueSize,
+              static_cast<off_t>(offset + sizeof(header)));
 
-    if (!valueLog_) return std::nullopt;
+        // Read checksum
+    uint32_t storedChecksum;
+        pread_all(valueLogFd_,
+              &storedChecksum,
+              sizeof(storedChecksum),
+              static_cast<off_t>(offset + sizeof(header) + header.valueSize));
 
-    return Value{std::move(value)};
+        // Recompute checksum
+    uint32_t computedChecksum = crc32_buf(&header, sizeof(header));
+    computedChecksum = crc32_extend(computedChecksum, value.data(), value.size());
+
+        if (storedChecksum != computedChecksum)
+        throw std::runtime_error("Value log corruption detected (checksum mismatch)");
+
+     return Value{std::move(value)};
 }
 
 
@@ -223,7 +222,7 @@ void Cognex::put(Key key,Value value)
     // std::move(key),
     // std::move(value)
 	// );
-        uint64_t offset = append_to_value_log_(static_cast<uint32_t>(key.value.size()),value.value);
+    uint64_t offset = append_to_value_log_(static_cast<uint32_t>(key.value.size()),value.value);
     IndexEntry indexEntry {
     offset,
     static_cast<uint32_t>(value.value.size())
@@ -274,13 +273,12 @@ std::optional<Value> Cognex::get(const Key& key) const{
 
     auto it = index_.find(key);
     if(it == index_.end()) return std::nullopt;
-
     return read_from_log_(it->second.offset, static_cast<uint32_t>(key.value.size()));
 }
 
 void Cognex::snapshot()
 {
-	write_snapshot_atomic(snapshot_path_,store_);
+	write_snapshot_atomic(snapshot_path_,index_);
 	wal_truncate(wal_path_);
 }
 
