@@ -35,11 +35,46 @@ ssize_t read_all(int fd, void* buf, size_t len)
     return total;
 }
 
+ssize_t pread_all(int fd, void* buf, size_t len, off_t offset)
+{
+    char* p = static_cast<char*>(buf);
+    size_t total = 0;
+
+    while (total < len)
+    {
+        ssize_t n = ::pread(fd, p + total, len - total, offset + total);
+
+        if (n < 0)
+            throw std::runtime_error("pread failed");
+
+        if (n == 0)
+            throw std::runtime_error("unexpected EOF");
+
+        total += n;
+    }
+
+    return total;
+}
+
 uint32_t crc32_str(const std::string& s)
 {
     return ::crc32(0,
                    reinterpret_cast<const Bytef*>(s.data()),
                    s.size());
+}
+
+uint32_t crc32_buf(const void* data, size_t len)
+{
+    return ::crc32(0,
+                   reinterpret_cast<const Bytef*>(data),
+                   len);
+}
+
+uint32_t crc32_extend(uint32_t prev_crc, const void* data, size_t len)
+{
+    return ::crc32(prev_crc,
+                   reinterpret_cast<const Bytef*>(data),
+                   len);
 }
 
 std::string clean_token(const std::string_view& token) 

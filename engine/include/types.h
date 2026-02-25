@@ -18,6 +18,13 @@ struct SnapshotPath
     explicit SnapshotPath(std::string v): value(std::move (v)){}
 };
 
+struct ValueLogPath
+{
+    std::string value;
+    explicit ValueLogPath(std::string v): value(std::move (v)){}
+};
+
+
 // ---------- db data ----------
 
 struct Key

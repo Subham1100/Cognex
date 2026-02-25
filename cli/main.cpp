@@ -16,7 +16,7 @@ int main()
 	std::filesystem::path base = std::filesystem::path(home) / ".cognex";
 	
 	std::filesystem::create_directories(base);
-	Cognex db(WalPath{(base/"wal.log").string()},SnapshotPath{(base/"snapshot.dat").string()});
+	Cognex db(WalPath{(base/"wal.log").string()},SnapshotPath{(base/"snapshot.dat").string()},ValueLogPath{(base/"value.log")});
 	
 	db.recover();
 	run_repl(db);
