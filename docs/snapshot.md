@@ -6,18 +6,37 @@ Snapshots store the full database state.
 
 ## Purpose
 
-- Faster recovery
-- Limit WAL replay
+- Faster crash recovery
+- Reduce WAL replay time
+- Bound WAL growth
 
 ---
 
 ## Behavior
 
-- Created via `SNAPSHOT` command
-- Used as recovery baseline
+- Manually via the SNAPSHOT command
+- Automatically after a configurable write threshold
+
+~~~
+size_t snapshotWriteOps_;
+size_t snapshotEveryNWriteOps_;
+~~~
 
 ---
 
 ## Recovery
 
-Snapshot + WAL → Restored state
+~~~
+Load Snapshot (if present)
+   ↓
+Replay WAL entries
+   ↓
+Restore consistent state
+~~~
+
+## Tradeoffs
+
+| Benefit            | Cost                         |
+| ------------------ | ---------------------------- |
+| Faster recovery    | Snapshot IO overhead         |
+| Smaller WAL replay | Periodic write amplification |

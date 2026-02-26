@@ -18,6 +18,24 @@ chmod +x install.sh
 ```
 Run with : ```./bin/Cognex```
 
+## Example Session
+~~~
+> PUT ("name") ("Alice is good")
+[Success]
+
+> GET ("name")
+Alice is good
+
+> QUERY ("good")
+0
+
+> DEL ("name")
+[Success]
+
+> GET ("name")
+[NIL]
+~~~
+
 ## Commands
 
 ### **PUT `<key>` `<value>`**
@@ -63,6 +81,18 @@ Deletes a key and its value from storage.
 
 DEL ("age")
 
+---
+### **QUERY `<token>`**
+
+Returns entries containing the token.
+
+Uses inverted index lookup
+
+**Example**
+
+QUERY ("alice")
+
+return all EntryId's where the value contains the word alice.
 
 ---
 
@@ -142,10 +172,10 @@ See:
 ## 🚀 Future Enhancements (Planned)
 
 - Typed values
-- Indexing
-- MVCC / transactions
+- ValueLog compaction
+- Concurrency control
+- Transactions / MVCC
 - Compression
-- Page-based storage
 
 ---
 
