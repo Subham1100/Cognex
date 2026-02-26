@@ -1,2 +1,6 @@
+* [Home](/)
+* [Guide](guide.md)
+* [Architecture](architecture.md)
+* [Internals](internals.md)
+* [API](api.md)
 * [GitHub](https://github.com/Subham1100/Cognex)
-* [Docs Home](/)

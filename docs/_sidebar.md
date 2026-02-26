@@ -9,6 +9,7 @@
 - Engine Deep Dive
   - [Storage Engine](/storage.md)
   - [WAL](/wal.md)
+  - [Indexing](/indexing.md)
   - [Snapshotting](/snapshot.md)
 
 - Benchmarks

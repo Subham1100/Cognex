@@ -1,28 +1,25 @@
 # Cognex
 
-Cognex is a **simple, persistent key–value database** written in C++.
+Cognex is a lightweight persistent key–value database written in C++.
 
-It is built to explore **database internals** such as durability, crash recovery, and storage engines, using:
+It is designed to explore database internals — durability, crash recovery, and storage engine mechanics — through a minimal yet practical implementation.
 
-- Write-Ahead Logging (WAL)
-- Periodic snapshots
-- A built-in interactive CLI (REPL)
-
-Cognex is lightweight, crash-safe, and designed for learning, experimentation, and systems-level understanding.
 
 ---
 
  [Documentation](https://subham1100.github.io/Cognex/)
 
-## Features
+## What Cognex Provides
 
-Persistent key–value storage
-Write-Ahead Log (WAL) for durability
-Snapshot-based fast recovery
-Interactive command-line interface (REPL)
-Token-based QUERY support (inverted index)
-Automatic data storage in ~/.cognex
-No runtime dependencies after installation
+- Write-Ahead Logging (WAL) for durability and crash safety
+- Append-only ValueLog storage for efficient sequential writes
+- Offset-based indexing for fast value retrieval
+- Batched fsync strategy for performance tuning
+- Periodic snapshots for reduced recovery time
+- Crash-safe recovery via snapshot + WAL replay
+- Interactive CLI (REPL) for direct database interaction
+- Token-based QUERY support powered by an inverted index
+- Automatic storage directory (~/.cognex)
 
 ---
 ---
@@ -35,8 +32,8 @@ Inserted **1,000,000 key–value pairs**
 | Metric | Value |
 |--------|--------|
 | Operations | 1,000,000 |
-| Total Time | 39.501 sec |
-| Throughput | **25,315.8 ops/sec** |
+| Total Time | 43.029 sec |
+| Throughput | **23240.1 ops/sec** |
 
 ---
 
@@ -48,8 +45,8 @@ Performed **1,000,000 random key lookups**
 | Metric | Value |
 |--------|--------|
 | Operations | 1,000,000 |
-| Total Time | 0.61 sec |
-| Throughput | **1,639,340 ops/sec** |
+| Total Time | 21.527 sec |
+| Throughput | **46453.3 ops/sec** |
 
 ---
 

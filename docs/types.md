@@ -74,11 +74,45 @@ Represents a stored database record.
 
 ---
 
-## **Hash Support**
+## **Posting**
 
-`Key` provides a `std::hash<Key>` specialization.
+Represents token metadata for an entry.
+
+**Fields**
+
+- `entryId` – Entry containing the token
+- `frequency` – Number of occurrences
+- `tokenPositions` – Positions within the value
 
 **Purpose**
 
-- Enables use in hash-based containers
-- Hash derived from underlying string
+- Enables inverted index queries
+
+
+---
+## **IndexEntry**
+
+Maps a key to its value location inside the ValueLog.
+
+**Fields**
+
+- `offset` – Byte offset in ValueLog
+- `valueSize` – Stored value size
+
+**Purpose**
+
+- Enables offset-based retrieval via pread()
+
+---
+
+## **RecordHeader**
+
+Header stored before ValueLog records.
+
+**Fields**
+
+- `keySize` – Key size metadata
+
+- `valueSize` – Value size
+
+---

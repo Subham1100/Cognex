@@ -9,28 +9,61 @@ This section briefly explains core internal mechanisms of Cognex.
 Cognex uses:
 
 - **Write-Ahead Log (WAL)** – Records mutations
+- **ValueLog** – Append-only storage for values
 - **Snapshots** – Persist full state
 
 ---
 
 ## Write Path
 
-1. Command received
-2. Mutation written to WAL
-3. Change applied to storage
+~~~
+Command received
+   ↓
+Mutation appended to WAL
+   ↓
+WAL fsync (batched)
+   ↓
+Value appended to ValueLog
+   ↓
+Index updated (key → offset)
+   ↓
+Tokenizer / inverted index updated
+~~~
+
+---
+
+## Read Path
+
+~~~
+GET request
+   ↓
+Index lookup (key → offset)
+   ↓
+pread(ValueLog, offset)
+~~~
+
+Cognex uses offset-based reads to avoid loading full ValueLog data into memory.
 
 ---
 
 ## Recovery Path
 
-1. Load latest snapshot (if present)
-2. Replay WAL entries
-3. Restore consistent state
+~~~
+Load latest snapshot (if present)
+   ↓
+Replay WAL entries
+   ↓
+Rebuild index/state
+   ↓
+Ready
+~~~
 
 ---
 
-## Design Focus
+## fsync Strategy
 
-- Simplicity
-- Crash safety
-- Deterministic recovery
+To balance durability and performance:
+
+- WAL fsync is batched
+- ValueLog writes are append-only
+- Snapshots reduce WAL replay overhead
