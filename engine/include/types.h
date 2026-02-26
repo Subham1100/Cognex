@@ -18,6 +18,13 @@ struct SnapshotPath
     explicit SnapshotPath(std::string v): value(std::move (v)){}
 };
 
+struct ValueLogPath
+{
+    std::string value;
+    explicit ValueLogPath(std::string v): value(std::move (v)){}
+};
+
+
 // ---------- db data ----------
 
 struct Key
@@ -90,12 +97,20 @@ struct TransparentEqual {
 };
 
 
-
-struct Index
+struct IndexEntry
 {
-    size_t offset;
-    size_t valueSize;
+    uint64_t offset;
+    uint32_t valueSize;
+
+    IndexEntry(uint64_t offset_, uint32_t valueSize_)
+        : offset(offset_), valueSize(valueSize_) {}
 };
+
+struct RecordHeader {
+    uint32_t keySize;     // metadata only
+    uint32_t valueSize;
+};
+
 
 // ---------- Hash specialization ----------
 

@@ -4,7 +4,7 @@
 
 
 
-void append_and_fsync(const WalPath& path,const std::string& record);
+void append_and_fsync(const WalPath& path,const std::string& record,size_t& walWrites_,size_t& walFsyncEveryNWrites_);
 
 void wal_truncate(const WalPath& path);
 
