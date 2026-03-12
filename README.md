@@ -94,7 +94,7 @@ Run with : ./bin/Cognex
 Inside the Cognex prompt:
 ```
 > PUT ("name") ("Alice is good") ---> entry 0
-> PUT ("name") ("Bob is good") -----> entry 1
+> PUT ("n") ("Bob is good") -----> entry 1
 [Sucess]
 > GET ("name")
 Alice is good
