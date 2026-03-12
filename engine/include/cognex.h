@@ -18,9 +18,16 @@ public:
 	void put(Key key, Value value) override;
 	std::optional<Value> get(const Key& key) const override;
 	bool del(const Key& key) override;
-	const std::vector<size_t>& query(std::string_view token) const;
+	// std::vector<size_t> query(std::string_view token) const;
+	std::vector<QueryResult> query(const Query& query) const;
 	uint64_t append_to_value_log_(uint32_t keySize, std::string_view value);
 	std::optional<Value> read_from_log_(uint64_t offset, uint32_t keySize) const;
+	void generate_candidates(QueryContext& ctx) const;
+	void apply_filters(QueryContext& ctx) const;
+	void rank_results(QueryContext& ctx) const;
+	void apply_topk(QueryContext& ctx) const;
+
+
 
     //------------Recovery-----------	
 
@@ -40,9 +47,10 @@ private:
 	//------------Secondary Storages-----------
 
 	std::vector<Entry> entries_;
-	//stores tokenIndex[token]->"Entry.entryId"
-	std::unordered_map<std::string,std::vector<size_t>,TransparentHash,TransparentEqual> tokenIndex_;
-	std::vector<Posting> postings_;
+	// //tokenIndex_ tokenIndex[token]->vector<"Entry.entryId"> forward indexing
+	// std::unordered_map<std::string,std::vector<size_t>,TransparentHash,TransparentEqual> tokenIndex_;
+	// posting_ posting[token]->vector<"posting"> //inverted indexing
+	std::unordered_map<std::string,std::vector<Posting>,TransparentHash,TransparentEqual> postings_;
 
 	//------ file ------
 	int valueLogFd_ = -1;

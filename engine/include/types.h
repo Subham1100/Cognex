@@ -111,6 +111,81 @@ struct RecordHeader {
     uint32_t valueSize;
 };
 
+// ---------------- Query -------------------
+
+struct Filter
+{
+    std::string field;
+    std::string op;
+    size_t value;
+};
+
+enum class QueryType
+{
+    TERM,
+    PHRASE,
+    BOOLEAN
+};
+
+enum class Ranking
+{
+    TF,
+    TF_IDF,
+    BM25
+};
+
+enum class SortField
+{
+    RELEVANCE,
+    SIMILARITY,
+    DATE,
+    LENGTH
+};
+
+struct Query
+{
+    std::vector<std::string> terms;
+    std::vector<Filter> filters;
+
+    size_t topK = SIZE_MAX;
+
+    bool useAnd = false;
+    bool useOr = false;
+    bool useNot = false;
+
+    QueryType type = QueryType::TERM;
+    Ranking ranking = Ranking::TF;
+    SortField sortBy = SortField::RELEVANCE;
+};
+
+
+
+struct QueryResult
+{
+    size_t entryId;
+    size_t relevance = 0;
+    size_t similarity = 0;
+    double score = 0.0; //for BM25
+};
+
+//This allows filters and ranking stages to work cleanly.
+
+struct QueryContext
+{
+    const Query& query;
+    std::vector<QueryResult> results;
+};
+
+struct FilterExpr
+{
+    std::string field;
+    std::string op;
+    std::string value;
+};
+
+
+
+
 
 // ---------- Hash specialization ----------
 

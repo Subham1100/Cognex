@@ -56,7 +56,6 @@ std::vector<std::string> Cognex::generate_tokens_update_tokenIndex_(std::string_
 	size_t startPointer = 0;
 	size_t valueLength = value.length();
 	size_t tokenNumber = 0;
-    std::unordered_map<std::string,size_t> currEntryIdPostingHash;
 
 	while(startPointer<valueLength)
 	{
@@ -71,25 +70,30 @@ std::vector<std::string> Cognex::generate_tokens_update_tokenIndex_(std::string_
 
         if(!token.empty())
         {
+            
         	// find the token in tokenIndex
-        	
-            auto existInCurrEntryIdPostingHash = currEntryIdPostingHash.find(token);
-            // find the existing token posting related to the entryId 
-            if(existInCurrEntryIdPostingHash == currEntryIdPostingHash.end())
-            {
-                size_t postingIndex = postings_.size();
-                postings_.emplace_back(entryId, 1, std::vector<size_t>{});
-                postings_.back().tokenPositions.push_back(tokenNumber);
-                currEntryIdPostingHash.emplace(token,postingIndex);
-                tokenIndex_[token].emplace_back(entryId);
+            auto& postingList = postings_[token]; 
+
+            // Try to find existing posting for this entryId
+            bool found = false;
+            for (auto& posting : postingList) {
+                if (posting.entryId == entryId) {
+                    posting.frequency++;
+                    posting.tokenPositions.push_back(tokenNumber);
+                    found = true;
+                    break;
+                }
             }
-            else 
-            {
-                size_t postingIndex = existInCurrEntryIdPostingHash->second;
-                postings_[postingIndex].frequency++;
-                postings_[postingIndex].tokenPositions.emplace_back(tokenNumber);
+           
+           // If not found, add new posting
+            if (!found) {
+                postingList.emplace_back(
+                    entryId,
+                    1,
+                    std::vector<size_t>{tokenNumber}
+                );
             }
-       
+
         	tokenVector.push_back(std::move(token));
         	tokenNumber++;
 
@@ -267,18 +271,135 @@ bool Cognex::del(const Key& key)
      return index_.erase(key) > 0;
 }
 
-const std::vector<size_t>& Cognex::query( std::string_view token) const
+// std::vector<size_t> Cognex::query(std::string_view token) const
+// {
+//     std::vector<size_t> result;
+
+//     auto it = postings_.find(std::string(token));
+//     if (it == postings_.end())
+//         return result;
+
+//     for (const auto& posting : it->second)
+//         result.push_back(posting.entryId);
+
+//     return result;
+// }
+
+void Cognex::generate_candidates(QueryContext& ctx) const
 {
-   
-   static const std::vector<size_t> empty;
+    // for a query with multiple terms, "apple" "banana"
+    // if a id contain both the terms it will be added twice with frequency 1
+    // so we store a temp map to mark frequency of a entryId with terms in the args
+    std::unordered_map<size_t, size_t> scores;
 
-    auto it = tokenIndex_.find(token);
+    for (const auto& term : ctx.query.terms)
+    {
+        auto it = postings_.find(term);
+        if (it == postings_.end())
+            continue;
 
-    if (it == tokenIndex_.end())
-        return empty;
+        for (const auto& posting : it->second)
+        {
+            scores[posting.entryId] += posting.frequency;
+        }
+    }
 
-    return it->second;
+    for (auto& [entryId, relevance] : scores)
+    {
+        QueryResult r;
+        r.entryId = entryId;
+        r.relevance = relevance;
+
+        ctx.results.push_back(r);
+    }
 }
+
+void Cognex::apply_filters(QueryContext& ctx) const
+{
+    std::vector<QueryResult> filtered;
+
+    for (const auto& r : ctx.results)
+    {
+        bool pass = true;
+
+        for (const auto& f : ctx.query.filters)
+        {
+            size_t fieldValue = 0;
+
+            if (f.field == "relevance")
+                fieldValue = r.relevance;
+
+            else if (f.field == "similarity")
+                fieldValue = r.similarity;
+
+            else
+                continue;
+
+            if (f.op == ">" && !(fieldValue > f.value))
+                pass = false;
+
+            else if (f.op == ">=" && !(fieldValue >= f.value))
+                pass = false;
+
+            else if (f.op == "<" && !(fieldValue < f.value))
+                pass = false;
+
+            else if (f.op == "<=" && !(fieldValue <= f.value))
+                pass = false;
+
+            else if (f.op == "=" && !(fieldValue == f.value))
+                pass = false;
+
+            if (!pass)
+                break;
+        }
+
+        if (pass)
+            filtered.push_back(r);
+    }
+
+    ctx.results.swap(filtered);
+}
+
+void Cognex::rank_results(QueryContext& ctx) const
+{
+    std::sort(ctx.results.begin(), ctx.results.end(),
+        [](const QueryResult& a, const QueryResult& b)
+        {
+            return a.relevance > b.relevance;
+        });
+}
+
+
+void Cognex::apply_topk(QueryContext& ctx) const
+{
+    if (ctx.results.size() > ctx.query.topK)
+        ctx.results.resize(ctx.query.topK);
+}
+
+
+
+std::vector<QueryResult> Cognex::query(const Query& query) const
+{
+    QueryContext ctx{query};
+
+    generate_candidates(ctx);
+
+    apply_filters(ctx);
+
+    rank_results(ctx);
+
+    apply_topk(ctx);
+
+    return ctx.results;
+}
+
+
+
+
+
+
+
 
 
 std::optional<Value> Cognex::get(const Key& key) const{
