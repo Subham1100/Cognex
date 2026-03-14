@@ -1,4 +1,4 @@
-#include "wal.h"
+#include "storage/wal.h"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -7,7 +7,7 @@
 #include <string>
 #include <string_view>
 #include <zlib.h>
-#include <utils.h>
+
 
 void append_and_fsync(const WalPath& path, const std::string& record, size_t& walWrites_,size_t& walFsyncEveryNWrites_)
 {

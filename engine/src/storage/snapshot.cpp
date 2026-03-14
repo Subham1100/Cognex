@@ -1,4 +1,4 @@
-#include "snapshot.h"
+#include "storage/snapshot.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>

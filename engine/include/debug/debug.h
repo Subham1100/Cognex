@@ -1,6 +1,6 @@
 #pragma once 
 #include <iostream>
-#include "types.h"
+#include "core/types.h"
 
 #ifndef COGNEX_DEBUG
 #define COGNEX_DEBUG 0

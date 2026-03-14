@@ -7,33 +7,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(ZLIB REQUIRED)
 
 # -----------------------------
-# CLI Core Sources
+# Collect Source Files
 # -----------------------------
-file(GLOB CLI_SOURCES
-    cli/*.cpp
-)
 
-file(GLOB CLI_CORE_SOURCES
-    cli/src/*.cpp
-)
-
-# -----------------------------
-# CLI Command Sources
-# -----------------------------
-file(GLOB CLI_COMMAND_SOURCES
-    cli/src/commands/*.cpp
-)
-
-# -----------------------------
-# Engine Sources
-# -----------------------------
-file(GLOB ENGINE_SOURCES
+file(GLOB_RECURSE ENGINE_SOURCES
     engine/src/*.cpp
 )
 
-# -----------------------------
-# Bench Sources (optional)
-# -----------------------------
+file(GLOB_RECURSE CLI_SOURCES
+    cli/*.cpp
+)
+
 file(GLOB BENCH_SOURCES
     bench/*.cpp
 )
@@ -41,17 +25,17 @@ file(GLOB BENCH_SOURCES
 # -----------------------------
 # Executable
 # -----------------------------
+
 add_executable(cognex
-    ${CLI_SOURCES}
-    ${CLI_CORE_SOURCES}
-    ${CLI_COMMAND_SOURCES}
     ${ENGINE_SOURCES}
+    ${CLI_SOURCES}
     ${BENCH_SOURCES}
 )
 
 # -----------------------------
 # Include Directories
 # -----------------------------
+
 target_include_directories(cognex
     PRIVATE
         engine/include
@@ -61,6 +45,7 @@ target_include_directories(cognex
 # -----------------------------
 # Compile Definitions
 # -----------------------------
+
 target_compile_definitions(cognex
     PRIVATE
         COGNEX_DEBUG=0
@@ -69,9 +54,14 @@ target_compile_definitions(cognex
 # -----------------------------
 # Link Libraries
 # -----------------------------
+
 target_link_libraries(cognex
     PRIVATE
         ZLIB::ZLIB
 )
+
+# -----------------------------
+# Install
+# -----------------------------
 
 install(TARGETS cognex DESTINATION bin)
