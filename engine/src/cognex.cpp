@@ -1,7 +1,4 @@
 #include "cognex.h"
-#include "wal.h"
-#include "snapshot.h"
-#include "debug.h"
 #include <string_view>
 
 
@@ -26,7 +23,7 @@ void Cognex::apply_record_(const std::string_view& record)
         Key key{std::string(key_sv)};
         Value value{std::string(value_sv)};
 
-        uint64_t offset = append_to_value_log_(
+        uint64_t offset = storageEngine_.append_to_value_log_(
             static_cast<uint32_t>(key.value.size()),
             value.value
         );
@@ -36,9 +33,11 @@ void Cognex::apply_record_(const std::string_view& record)
             static_cast<uint32_t>(value.value.size())
         };
 
+        // push_entry_(key, value);
+        indexEngine_.insert(key, value, entries_,postings_);
         index_.insert_or_assign(std::move(key), indexEntry);
 
-        push_entry_(key, value);
+        
     }
     else if (op == "DEL")
     {
@@ -50,192 +49,146 @@ void Cognex::apply_record_(const std::string_view& record)
 }
 
 
-std::vector<std::string> Cognex::generate_tokens_update_tokenIndex_(std::string_view value, size_t entryId)
-{
-	std::vector<std::string> tokenVector;
-	size_t startPointer = 0;
-	size_t valueLength = value.length();
-	size_t tokenNumber = 0;
 
-	while(startPointer<valueLength)
-	{
-        while (startPointer < valueLength && value[startPointer] == ' ')
-        startPointer++;
-        if (startPointer >= valueLength)
-        break;
-		size_t endPointer = value.find(' ',startPointer);
-		if(endPointer == std::string_view::npos)
-			endPointer=value.length();
-		std::string token = clean_token(value.substr(startPointer, endPointer - startPointer));
 
-        if(!token.empty())
-        {
-            
-        	// find the token in tokenIndex
-            auto& postingList = postings_[token]; 
-
-            // Try to find existing posting for this entryId
-            bool found = false;
-            for (auto& posting : postingList) {
-                if (posting.entryId == entryId) {
-                    posting.frequency++;
-                    posting.tokenPositions.push_back(tokenNumber);
-                    found = true;
-                    break;
-                }
-            }
-           
-           // If not found, add new posting
-            if (!found) {
-                postingList.emplace_back(
-                    entryId,
-                    1,
-                    std::vector<size_t>{tokenNumber}
-                );
-            }
-
-        	tokenVector.push_back(std::move(token));
-        	tokenNumber++;
-
-        }
-        startPointer = endPointer + 1;
-	}
-	
-	return tokenVector;
-}
-
-void Cognex::push_entry_(Key key, Value value)
-{
-	size_t currId = entries_.size();
-	Entry entry {currId,key,value,generate_tokens_update_tokenIndex_(std::string_view(value.value),currId)};
-    entries_.push_back(std::move(entry));
-}
+// void Cognex::push_entry_(Key key, Value value)
+// {
+// 	size_t currId = entries_.size();
+// 	Entry entry {currId,key,value,generate_tokens_update_tokenIndex_(std::string_view(value.value),currId)};
+//     entries_.push_back(std::move(entry));
+// }
 
 
 //-------------Engine-------------
 
-Cognex::Cognex(WalPath wal_path,SnapshotPath snapshot_path,ValueLogPath valuelog_path
-	):wal_path_(std::move(wal_path)),snapshot_path_(std::move(snapshot_path)),valuelog_path_(std::move(valuelog_path)){}
+// Cognex::Cognex(WalPath wal_path,SnapshotPath snapshot_path,ValueLogPath valuelog_path
+// 	):wal_path_(std::move(wal_path)),snapshot_path_(std::move(snapshot_path)),valuelog_path_(std::move(valuelog_path)){}
+
+Cognex::Cognex(WalPath wal_path,
+               SnapshotPath snapshot_path,
+               ValueLogPath valuelog_path)
+: storageEngine_(std::move(wal_path),
+                 std::move(snapshot_path),
+                 std::move(valuelog_path))
+{}
 
 void Cognex::recover()
 {
-    load_snapshot(snapshot_path_, index_);
-
-    wal_replay(wal_path_,
+    storageEngine_.recover(index_,
         [this](std::string_view rec)
         {
             apply_record_(rec);
         });
 }
 
-void Cognex::open_value_log_if_needed_()
-{
-    if (valueLogFd_ != -1)
-        return;
+// void Cognex::open_value_log_if_needed_()
+// {
+//     if (valueLogFd_ != -1)
+//         return;
 
-    valueLogFd_ = ::open(
-        valuelog_path_.value.c_str(),
-        O_RDWR | O_CREAT | O_APPEND,
-        0644
-    );
+//     valueLogFd_ = ::open(
+//         valuelog_path_.value.c_str(),
+//         O_RDWR | O_CREAT | O_APPEND,
+//         0644
+//     );
 
-    if (valueLogFd_ == -1)
-        throw std::runtime_error("Failed to open values.log");
-}
+//     if (valueLogFd_ == -1)
+//         throw std::runtime_error("Failed to open values.log");
+// }
 
-uint64_t Cognex::append_to_value_log_(uint32_t keySize, std::string_view value)
-{
-    // valueLog_.log -> header[[key_size][value_size]][value][checksum]
-    open_value_log_if_needed_();
+// uint64_t Cognex::append_to_value_log_(uint32_t keySize, std::string_view value)
+// {
+//     // valueLog_.log -> header[[key_size][value_size]][value][checksum]
+//     open_value_log_if_needed_();
 
-    off_t offset = lseek(valueLogFd_, 0, SEEK_END);
-    if (offset == -1)
-        throw std::runtime_error("lseek failed");
+//     off_t offset = lseek(valueLogFd_, 0, SEEK_END);
+//     if (offset == -1)
+//         throw std::runtime_error("lseek failed");
 
-    RecordHeader header {
-        keySize,
-        static_cast<uint32_t>(value.size())
-    };
+//     RecordHeader header {
+//         keySize,
+//         static_cast<uint32_t>(value.size())
+//     };
 
-    uint32_t checksum = crc32_buf(&header, sizeof(header));
-    checksum = crc32_extend(checksum, value.data(), value.size());
+//     uint32_t checksum = crc32_buf(&header, sizeof(header));
+//     checksum = crc32_extend(checksum, value.data(), value.size());
 
-    write_all(valueLogFd_, &header, sizeof(header));
-    write_all(valueLogFd_, value.data(), value.size());
-    write_all(valueLogFd_, &checksum, sizeof(checksum));
+//     write_all(valueLogFd_, &header, sizeof(header));
+//     write_all(valueLogFd_, value.data(), value.size());
+//     write_all(valueLogFd_, &checksum, sizeof(checksum));
 
-    valueLogWrites_++;
-    if(valueLogWrites_>=valueLogFsyncEveryNWrites_)
-    {
-         if(fsync(valueLogFd_)!=0)
-        {
-            throw std::runtime_error("fsync WAL error at append_to_value_log_");
-        }
-        valueLogWrites_=0;
-    }
+//     valueLogWrites_++;
+//     if(valueLogWrites_>=valueLogFsyncEveryNWrites_)
+//     {
+//          if(fsync(valueLogFd_)!=0)
+//         {
+//             throw std::runtime_error("fsync WAL error at append_to_value_log_");
+//         }
+//         valueLogWrites_=0;
+//     }
     
 
-    return static_cast<uint64_t>(offset);
-}
+//     return static_cast<uint64_t>(offset);
+// }
 
-std::optional<Value> Cognex::read_from_log_(uint64_t offset, uint32_t keySize) const
-{
-    if (valueLogFd_ == -1)
-        throw std::runtime_error("Value log not open");
-    // Seek to the PROVIDED offset (not end)
-    off_t pos = ::lseek(valueLogFd_, static_cast<off_t>(offset), SEEK_SET);
+// std::optional<Value> Cognex::read_from_log_(uint64_t offset, uint32_t keySize) const
+// {
+//     if (valueLogFd_ == -1)
+//         throw std::runtime_error("Value log not open");
+//     // Seek to the PROVIDED offset (not end)
+//     off_t pos = ::lseek(valueLogFd_, static_cast<off_t>(offset), SEEK_SET);
 
 
-    if (pos == -1)
-        throw std::runtime_error("lseek failed");
+//     if (pos == -1)
+//         throw std::runtime_error("lseek failed");
 
-    RecordHeader header;
-    // Read header
-    // Use pread_all() to perform offset-based reads without modifying the
-    // shared file descriptor cursor. This prevents read/write interference.
-    pread_all(valueLogFd_, &header, sizeof(header),offset);
+//     RecordHeader header;
+//     // Read header
+//     // Use pread_all() to perform offset-based reads without modifying the
+//     // shared file descriptor cursor. This prevents read/write interference.
+//     pread_all(valueLogFd_, &header, sizeof(header),offset);
 
-    // // Validate key size
-    if (header.keySize != keySize)
-        throw std::runtime_error("Key size discrepancy detected");
+//     // // Validate key size
+//     if (header.keySize != keySize)
+//         throw std::runtime_error("Key size discrepancy detected");
 
-        // Read value
-    std::string value(header.valueSize, '\0');
-        // Read value at precise offset
-    pread_all(valueLogFd_,
-              value.data(),
-              header.valueSize,
-              static_cast<off_t>(offset + sizeof(header)));
+//         // Read value
+//     std::string value(header.valueSize, '\0');
+//         // Read value at precise offset
+//     pread_all(valueLogFd_,
+//               value.data(),
+//               header.valueSize,
+//               static_cast<off_t>(offset + sizeof(header)));
 
-        // Read checksum
-    uint32_t storedChecksum;
-        pread_all(valueLogFd_,
-              &storedChecksum,
-              sizeof(storedChecksum),
-              static_cast<off_t>(offset + sizeof(header) + header.valueSize));
+//         // Read checksum
+//     uint32_t storedChecksum;
+//         pread_all(valueLogFd_,
+//               &storedChecksum,
+//               sizeof(storedChecksum),
+//               static_cast<off_t>(offset + sizeof(header) + header.valueSize));
 
-        // Recompute checksum
-    uint32_t computedChecksum = crc32_buf(&header, sizeof(header));
-    computedChecksum = crc32_extend(computedChecksum, value.data(), value.size());
+//         // Recompute checksum
+//     uint32_t computedChecksum = crc32_buf(&header, sizeof(header));
+//     computedChecksum = crc32_extend(computedChecksum, value.data(), value.size());
 
-        if (storedChecksum != computedChecksum)
-        throw std::runtime_error("Value log corruption detected (checksum mismatch)");
+//         if (storedChecksum != computedChecksum)
+//         throw std::runtime_error("Value log corruption detected (checksum mismatch)");
 
-     return Value{std::move(value)};
-}
+//      return Value{std::move(value)};
+// }
 
 
 void Cognex::put(Key key,Value value)
 {
 
 
-	append_and_fsync(wal_path_,"PUT " + key.value + " "+ value.value, walWrites_, walFsyncEveryNWrites_);
-	
+	// append_and_fsync(wal_path_,"PUT " + key.value + " "+ value.value, walWrites_, walFsyncEveryNWrites_);
+	storageEngine_.append_wal_record("PUT " + key.value + " "+ value.value);
     // store_.insert_or_assign(
     // std::move(key),
     // std::move(value)
 	// );
-    uint64_t offset = append_to_value_log_(static_cast<uint32_t>(key.value.size()),value.value);
+    uint64_t offset = storageEngine_.append_to_value_log_(static_cast<uint32_t>(key.value.size()),value.value);
     IndexEntry indexEntry {
     offset,
     static_cast<uint32_t>(value.value.size())
@@ -243,9 +196,11 @@ void Cognex::put(Key key,Value value)
     
 	
 
-    push_entry_(key, value);// push entry should go after append_to_log: if crash 
+    // push_entry_(key, value);// push entry should go after append_to_log: if crash 
                             //after WAL the PUT will be there and no offset
                             // WAL-> push_entry (can take time) -> offset (this can be missed)
+    indexEngine_.insert(key, value, entries_,postings_);
+
     index_.insert_or_assign(std::move(key), indexEntry);
 
     snapshotWriteOps_++;
@@ -264,8 +219,7 @@ bool Cognex::del(const Key& key)
 	// append_and_fsync(wal_path_,"DEL " +key.value);
 	// store_.erase(key);
 	// return true;
-
-    append_and_fsync(wal_path_, "DEL " + key.value, walWrites_,walFsyncEveryNWrites_);
+    storageEngine_.append_wal_record( "DEL " + key.value);
 
         // if we delete bytes from valueLog_.log offset indexing will change.
      return index_.erase(key) > 0;
@@ -285,121 +239,10 @@ bool Cognex::del(const Key& key)
 //     return result;
 // }
 
-void Cognex::generate_candidates(QueryContext& ctx) const
-{
-    // for a query with multiple terms, "apple" "banana"
-    // if a id contain both the terms it will be added twice with frequency 1
-    // so we store a temp map to mark frequency of a entryId with terms in the args
-    std::unordered_map<size_t, size_t> scores;
-
-    for (const auto& term : ctx.query.terms)
-    {
-        auto it = postings_.find(term);
-        if (it == postings_.end())
-            continue;
-
-        for (const auto& posting : it->second)
-        {
-            scores[posting.entryId] += posting.frequency;
-        }
-    }
-
-    for (auto& [entryId, relevance] : scores)
-    {
-        QueryResult r;
-        r.entryId = entryId;
-        r.relevance = relevance;
-
-        ctx.results.push_back(r);
-    }
-}
-
-void Cognex::apply_filters(QueryContext& ctx) const
-{
-    std::vector<QueryResult> filtered;
-
-    for (const auto& r : ctx.results)
-    {
-        bool pass = true;
-
-        for (const auto& f : ctx.query.filters)
-        {
-            size_t fieldValue = 0;
-
-            if (f.field == "relevance")
-                fieldValue = r.relevance;
-
-            else if (f.field == "similarity")
-                fieldValue = r.similarity;
-
-            else
-                continue;
-
-            if (f.op == ">" && !(fieldValue > f.value))
-                pass = false;
-
-            else if (f.op == ">=" && !(fieldValue >= f.value))
-                pass = false;
-
-            else if (f.op == "<" && !(fieldValue < f.value))
-                pass = false;
-
-            else if (f.op == "<=" && !(fieldValue <= f.value))
-                pass = false;
-
-            else if (f.op == "=" && !(fieldValue == f.value))
-                pass = false;
-
-            if (!pass)
-                break;
-        }
-
-        if (pass)
-            filtered.push_back(r);
-    }
-
-    ctx.results.swap(filtered);
-}
-
-void Cognex::rank_results(QueryContext& ctx) const
-{
-    std::sort(ctx.results.begin(), ctx.results.end(),
-        [](const QueryResult& a, const QueryResult& b)
-        {
-            return a.relevance > b.relevance;
-        });
-}
-
-
-void Cognex::apply_topk(QueryContext& ctx) const
-{
-    if (ctx.results.size() > ctx.query.topK)
-        ctx.results.resize(ctx.query.topK);
-}
-
-
-
 std::vector<QueryResult> Cognex::query(const Query& query) const
 {
-    QueryContext ctx{query};
-
-    generate_candidates(ctx);
-
-    apply_filters(ctx);
-
-    rank_results(ctx);
-
-    apply_topk(ctx);
-
-    return ctx.results;
+    return queryEngine_.execute(query, postings_);
 }
-
-
-
-
-
-
-
 
 
 std::optional<Value> Cognex::get(const Key& key) const{
@@ -410,12 +253,12 @@ std::optional<Value> Cognex::get(const Key& key) const{
 
     auto it = index_.find(key);
     if(it == index_.end()) return std::nullopt;
-    return read_from_log_(it->second.offset, static_cast<uint32_t>(key.value.size()));
+    return storageEngine_.read_from_log_(it->second.offset, static_cast<uint32_t>(key.value.size()));
 }
 
 void Cognex::snapshot()
 {
-	write_snapshot_atomic(snapshot_path_,index_);
-	wal_truncate(wal_path_);
+	storageEngine_.snapshot(index_);
 }
 
+    

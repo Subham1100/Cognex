@@ -1,4 +1,4 @@
-#include "debug.h"
+#include "debug/debug.h"
 
 void debug_posting_array(std::vector<Posting>& postings)
 {
