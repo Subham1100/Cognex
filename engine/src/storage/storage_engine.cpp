@@ -15,6 +15,9 @@ StorageEngine::StorageEngine(WalPath wal,
 void StorageEngine::recover(std::unordered_map<Key,IndexEntry>& index_,
                             std::function<void(std::string_view)> apply_record_)
 {
+    // open value log before reading anything from it
+    open_value_log_if_needed_();
+
     load_snapshot(snapshot_path_, index_);
 
     wal_replay(wal_path_,
@@ -128,6 +131,7 @@ void StorageEngine::append_wal_record(const std::string& record)
 
 void StorageEngine::snapshot(const std::unordered_map<Key,IndexEntry>& index_)
 {
+    
     write_snapshot_atomic(snapshot_path_, index_);
 
     wal_truncate(wal_path_);

@@ -65,13 +65,12 @@ void IndexEngine::insert(
     std::unordered_map<std::string,
                        std::vector<Posting>,
                        TransparentHash,
-                       TransparentEqual>& postings_) const
+                       TransparentEqual>& postings_,size_t& totalTokens_) const
 {
     size_t currId = entries_.size();
 
-    auto tokens = tokenize_and_update(value.value, currId, postings_);
-
-    Entry entry{currId, key, value, tokens};
-
-    entries_.push_back(std::move(entry));
+    auto tokens = tokenize_and_update(value.value, currId, postings_ );
+    totalTokens_+=tokens.size();
+    entries_.emplace_back(currId, key, value, std::move(tokens));
+  
 }

@@ -12,7 +12,7 @@ public:
     const std::unordered_map<std::string,
                              std::vector<Posting>,
                              TransparentHash,
-                             TransparentEqual>& postings_) const;
+                             TransparentEqual>& postings_, size_t totalDocs, size_t totalTokens_,const std::vector<Entry>& entries_) const;
 
 private:
 	void generate_candidates(
@@ -20,7 +20,7 @@ private:
         const std::unordered_map<std::string,
                              std::vector<Posting>,
                              TransparentHash,
-                             TransparentEqual>& postings_) const;
+                             TransparentEqual>& postings_,size_t totalDocs, size_t totalTokens_,const std::vector<Entry>& entries_) const;
 
     void apply_filters(QueryContext& ctx) const;
 

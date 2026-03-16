@@ -45,7 +45,7 @@ private:
 
 	//------------Main DB----------- 
 
-	// std::unordered_map<Key,Value> store_;
+	// std::unordered_map<Key,Value(offset)> store_;
 	std::unordered_map<Key, IndexEntry> index_;
 
 	//------------Secondary Storages-----------
@@ -68,6 +68,8 @@ private:
 
 	size_t snapshotWriteOps_ = 0;
 	size_t snapshotEveryNWriteOps_ = 10000000;
+
+	size_t totalTokens_ = 0;
 
 	//------------Helpers-----------
 
