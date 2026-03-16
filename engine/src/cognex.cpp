@@ -34,7 +34,7 @@ void Cognex::apply_record_(const std::string_view& record)
         };
 
         // push_entry_(key, value);
-        indexEngine_.insert(key, value, entries_,postings_);
+        indexEngine_.insert(key, value, entries_,postings_, totalTokens_);
         index_.insert_or_assign(std::move(key), indexEntry);
 
         
@@ -74,11 +74,32 @@ Cognex::Cognex(WalPath wal_path,
 
 void Cognex::recover()
 {
+
+    //storage recover
     storageEngine_.recover(index_,
         [this](std::string_view rec)
         {
             apply_record_(rec);
         });
+
+    // reset search structures
+    entries_.clear();
+    postings_.clear();
+    totalTokens_ = 0;
+
+    // rebuild search index from recovered KV index
+    // index[key] = indexEntry
+    for (auto& [key, idx] : index_)
+    {
+        auto value = storageEngine_.read_from_log_(idx.offset, static_cast<uint32_t>(key.value.size()));
+
+        indexEngine_.insert(
+            key,
+            *value,
+            entries_,
+            postings_,
+            totalTokens_);
+    }
 }
 
 // void Cognex::open_value_log_if_needed_()
@@ -199,7 +220,7 @@ void Cognex::put(Key key,Value value)
     // push_entry_(key, value);// push entry should go after append_to_log: if crash 
                             //after WAL the PUT will be there and no offset
                             // WAL-> push_entry (can take time) -> offset (this can be missed)
-    indexEngine_.insert(key, value, entries_,postings_);
+    indexEngine_.insert(key, value, entries_,postings_,totalTokens_);
 
     index_.insert_or_assign(std::move(key), indexEntry);
 
@@ -241,7 +262,9 @@ bool Cognex::del(const Key& key)
 
 std::vector<QueryResult> Cognex::query(const Query& query) const
 {
-    return queryEngine_.execute(query, postings_);
+    size_t totalDocs = index_.size();
+
+    return queryEngine_.execute(query, postings_,totalDocs,totalTokens_,entries_);
 }
 
 

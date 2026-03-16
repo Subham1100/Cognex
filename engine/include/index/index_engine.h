@@ -17,7 +17,7 @@ public:
                 std::unordered_map<std::string,
                                    std::vector<Posting>,
                                    TransparentHash,
-                                   TransparentEqual>& postings_) const;
+                                   TransparentEqual>& postings_, size_t& totalTokens_) const;
 
 private:
 

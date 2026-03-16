@@ -109,6 +109,33 @@ else if (f.field == "relevance" || f.field == "similarity")
 }
 }
 
+std::vector<std::string> split_terms(const std::string& text)
+{
+    std::vector<std::string> terms;
+    std::string current;
+
+    for (char c : text)
+    {
+        if (std::isspace(c))
+        {
+            if (!current.empty())
+            {
+                terms.push_back(current);
+                current.clear();
+            }
+        }
+        else
+        {
+            current += c;
+        }
+    }
+
+    if (!current.empty())
+        terms.push_back(current);
+
+    return terms;
+}
+
 Query parse_query(const std::vector<std::string>& args)
 {
     Query q;
@@ -117,7 +144,9 @@ Query parse_query(const std::vector<std::string>& args)
         return q;
 
     // first argument is the search term
-    q.terms.push_back(args[0]);
+    // q.terms.push_back(args[0]);
+    auto terms = split_terms(args[0]);
+    q.terms.insert(q.terms.end(), terms.begin(), terms.end());
 
     // remaining arguments are filters
     for (size_t i = 1; i < args.size(); i++)
