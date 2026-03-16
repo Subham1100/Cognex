@@ -32,6 +32,7 @@ public:
 	// void apply_filters(QueryContext& ctx) const;
 	// void rank_results(QueryContext& ctx) const;
 	// void apply_topk(QueryContext& ctx) const;
+	const Entry& get_entry(size_t entryId) const;
 
     //------------Recovery-----------	
 

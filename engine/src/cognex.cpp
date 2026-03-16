@@ -268,6 +268,8 @@ std::vector<QueryResult> Cognex::query(const Query& query) const
 }
 
 
+
+
 std::optional<Value> Cognex::get(const Key& key) const{
 
 	// auto it = store_.find(key);
@@ -277,6 +279,11 @@ std::optional<Value> Cognex::get(const Key& key) const{
     auto it = index_.find(key);
     if(it == index_.end()) return std::nullopt;
     return storageEngine_.read_from_log_(it->second.offset, static_cast<uint32_t>(key.value.size()));
+}
+
+const Entry& Cognex::get_entry(size_t entryId) const
+{
+    return entries_.at(entryId);
 }
 
 void Cognex::snapshot()
