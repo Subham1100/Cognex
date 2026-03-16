@@ -193,9 +193,19 @@ void QueryEngine::apply_filters(QueryContext& ctx) const
 void QueryEngine::rank_results(QueryContext& ctx) const
 {
     std::sort(ctx.results.begin(), ctx.results.end(),
-        [](const QueryResult& a, const QueryResult& b)
+        [&](const QueryResult& a, const QueryResult& b)
         {
-            return a.relevance > b.relevance;
+            switch (ctx.query.sortBy)
+            {
+                case SortField::RELEVANCE:
+                    return a.relevance > b.relevance;
+
+                case SortField::SIMILARITY:
+                    return a.similarity > b.similarity;
+
+                default:
+                    return a.relevance > b.relevance;
+            }
         });
 }
 
