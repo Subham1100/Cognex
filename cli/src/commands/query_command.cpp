@@ -90,23 +90,47 @@ void parse_filter(const std::string& expr, Query& q)
     // normalize field to lowercase
     std::transform(f.field.begin(), f.field.end(), f.field.begin(), ::tolower);
 
+    //---------------------------------
+    // sortby filter
+    //---------------------------------
+    if (f.field == "sortby" || f.field == "sort by")
+    {
+        std::string val = f.value;
+
+        std::transform(val.begin(), val.end(), val.begin(), ::tolower);
+
+        if (val == "relevance")
+            q.sortBy = SortField::RELEVANCE;
+
+        else if (val == "similarity")
+            q.sortBy = SortField::SIMILARITY;
+
+        return;
+    }
     size_t val = 0;
 
     try {
-        val = std::stoul(f.value);
-    }
-    catch (...) {
-        return;
-    }
+            val = std::stoul(f.value);
+        }
+    catch (...) 
+        {
+            return;
+        }
 
+    //---------------------------------
+    // topk
+    //---------------------------------
     if (f.field == "top" && f.op == "=")
-{
-    q.topK = val;
-}
-else if (f.field == "relevance" || f.field == "similarity")
-{
-    q.filters.push_back({f.field, f.op, val});
-}
+        {
+            q.topK = val;
+        }
+    //---------------------------------
+    // numeric filters
+    //---------------------------------
+    else if (f.field == "relevance" || f.field == "similarity")
+        {
+            q.filters.push_back({f.field, f.op, val});
+        }
 }
 
 std::vector<std::string> split_terms(const std::string& text)
@@ -180,6 +204,14 @@ void QueryCommand::execute(Cognex& db,
 
     std::cout << "Found entries:\n";
 
-    for (QueryResult query_result : results)
-        std::cout << "  " << query_result.entryId << "\n";
+    for (const QueryResult& query_result : results)
+    {
+        const Entry& entry = db.get_entry(query_result.entryId);
+
+        std::cout << "  " << query_result.entryId
+                  << " key=" << entry.key.value
+                  << " relevance=" << query_result.relevance
+                  << " similarity=" << query_result.similarity
+                  << std::endl;
+    }
 }
