@@ -51,11 +51,22 @@ void QueryEngine::generate_candidates(
     // if a id contain both the terms it will be added twice with frequency 1
     // so we store a temp map to mark frequency of a entryId with terms in the args
 
-    // raw term-frequency based relevance score (used for filters / legacy ranking)
-    std::unordered_map<size_t, size_t> termFrequencyScores;
 
+    if (termFrequencyScoresBuffer_.size() < entries_.size())
+    {
+    // raw term-frequency based relevance score (used for filters / legacy ranking)
+        termFrequencyScoresBuffer_.resize(entries_.size(), 0);
     // similarity score using BM25 ranking
-    std::unordered_map<size_t, double> bm25Scores;
+        bm25ScoresBuffer_.resize(entries_.size(), 0.0);
+    }
+
+    touchedDocs_.clear();
+
+
+    // Track only documents touched by the query
+    touchedDocs_.reserve(1024);
+
+    ctx.results.reserve(1024);
 
     // BM25 hyperparameters 
     const double k = 1.2;//Controls TF saturation
@@ -85,10 +96,14 @@ void QueryEngine::generate_candidates(
         {
             size_t docId = posting.entryId;
 
+            // First time we see this doc → record it
+            if (termFrequencyScoresBuffer_[docId] == 0)
+                touchedDocs_.push_back(docId);
+
             // TF = how many times term appears in document
             size_t termFrequency = posting.frequency;
 
-            termFrequencyScores[docId] += termFrequency;
+            termFrequencyScoresBuffer_[docId] += termFrequency;
 
             // |D| = length of document in tokens
             // used by BM25 to penalize long documents
@@ -106,31 +121,32 @@ void QueryEngine::generate_candidates(
                 inverseDocumentFrequency);
 
             // accumulate similarity score
-            bm25Scores[docId] += bm25Contribution;
+            bm25ScoresBuffer_[docId] += bm25Contribution;
         }
     }
 
     //get maxScore to normalize BM25 scores.
-    //
+    // Find max BM25 score only among touched docs
     double maxScore = 0.0;
 
-    for (const auto& [docId, score] : bm25Scores)
+    for (size_t docId : touchedDocs_)
     {
+        double score = bm25ScoresBuffer_[docId];
         if (score > maxScore)
             maxScore = score;
     }
 
     // convert temporary score maps into QueryResult objects
-    for (auto& [docId, tfScore] : termFrequencyScores)
+    for (size_t docId : touchedDocs_)
     {
         QueryResult result;
 
         result.entryId = docId;
 
         // raw TF relevance (useful for filters like relevance > X)
-        result.relevance = tfScore;
+        result.relevance = termFrequencyScoresBuffer_[docId];
 
-        double score = bm25Scores[docId];
+        double score = bm25ScoresBuffer_[docId];
         if (maxScore > 0)
         score = (score / maxScore) * 100.0;
 
@@ -138,6 +154,13 @@ void QueryEngine::generate_candidates(
         result.similarity = static_cast<size_t>(std::round(score));
 
         ctx.results.push_back(result);
+    }
+
+    // Reset buffers only for touched docs
+    for (size_t docId : touchedDocs_)
+    {
+        termFrequencyScoresBuffer_[docId] = 0;
+        bm25ScoresBuffer_[docId] = 0.0;
     }
 }
 
@@ -192,21 +215,40 @@ void QueryEngine::apply_filters(QueryContext& ctx) const
 
 void QueryEngine::rank_results(QueryContext& ctx) const
 {
-    std::sort(ctx.results.begin(), ctx.results.end(),
-        [&](const QueryResult& a, const QueryResult& b)
+    auto comp = [&](const QueryResult& a, const QueryResult& b)
+    {
+        switch (ctx.query.sortBy)
         {
-            switch (ctx.query.sortBy)
-            {
-                case SortField::RELEVANCE:
-                    return a.relevance > b.relevance;
+            case SortField::SIMILARITY:
+                return a.similarity > b.similarity;
 
-                case SortField::SIMILARITY:
-                    return a.similarity > b.similarity;
+            case SortField::RELEVANCE:
+            default:
+                return a.relevance > b.relevance;
+        }
+    };
 
-                default:
-                    return a.relevance > b.relevance;
-            }
-        });
+    size_t k = ctx.query.topK;
+
+    if (k >= ctx.results.size())
+    {
+        std::sort(ctx.results.begin(), ctx.results.end(), comp);
+        return;
+    }
+
+    // Partition so topK elements are first
+    std::nth_element(
+        ctx.results.begin(),
+        ctx.results.begin() + k,
+        ctx.results.end(),
+        comp
+    );
+
+    // Remove everything after topK
+    ctx.results.resize(k);
+
+    // Sort only the topK results
+    std::sort(ctx.results.begin(), ctx.results.end(), comp);
 }
 
 void QueryEngine::apply_topk(QueryContext& ctx) const
@@ -227,7 +269,7 @@ std::vector<QueryResult> QueryEngine::execute(
     generate_candidates(ctx, postings_,totalDocs, totalTokens_,entries_);
     apply_filters(ctx);
     rank_results(ctx);
-    apply_topk(ctx);
+    // apply_topk(ctx);
 
     return ctx.results;
 }

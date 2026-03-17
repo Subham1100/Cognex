@@ -147,7 +147,7 @@ struct Query
     std::vector<std::string> terms;
     std::vector<Filter> filters;
 
-    size_t topK = SIZE_MAX;
+    size_t topK = 10;
 
     bool useAnd = false;
     bool useOr = false;
