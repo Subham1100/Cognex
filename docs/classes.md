@@ -6,7 +6,7 @@ Overview of core classes in Cognex.
 
 ## **Cognex**
 
-Primary database implementation.
+Primary database implementation and façade over the storage, indexing, and query engines.
 
 **Inheritance**
 
@@ -19,7 +19,7 @@ Primary database implementation.
 
 ### `Cognex(WalPath wal_path, SnapshotPath snapshot_path, ValueLogPath value_log_path)`
 
-Initializes the database with persistence paths.
+Initializes the database with persistence paths. Internally, these are passed to `StorageEngine`.
 
 **Parameters**
 
@@ -35,11 +35,11 @@ Initializes the database with persistence paths.
 
 Stores or updates a key–value pair.
 
-- Appends mutation to WAL
-- Appends value to ValueLog
-- Updates offset-based index
-- Updates inverted index
-- Overwrites existing values
+- Appends a textual `PUT` record to the WAL via `StorageEngine`.
+- Appends the value (with header and checksum) to the value log.
+- Updates the in-memory offset-based index (`Key → IndexEntry`).
+- Tokenizes the value and updates the inverted index (`postings_`) via `IndexEngine`.
+- Overwrites existing values if the key is already present.
 
 ---
 
@@ -47,8 +47,8 @@ Stores or updates a key–value pair.
 
 Retrieves value associated with a key.
 
-- Resolves offset via index
-- Reads value using pread()
+- Resolves the value-log offset and size via the in-memory index.
+- Reads and verifies the record using `StorageEngine::read_from_log_`.
 
 ---
 
@@ -56,15 +56,17 @@ Retrieves value associated with a key.
 
 Deletes a key from the index.
 
-- Mutation recorded in WAL
-- Index entry removed
+- Records a `DEL` mutation in the WAL.
+- Removes the index entry if present and returns `true`; otherwise returns `false`.
 
 ---
-### `query(std::string_view token)`
+### `query(const Query& query) -> std::vector<QueryResult>`
 
-Returns entries containing the token.
+Executes a full-text query over stored values.
 
-- Uses inverted index lookup
+- Delegates to `QueryEngine::execute`.
+- Uses the inverted index and BM25-based scoring.
+- Applies filters and sorting as specified in the `Query`.
 
 ---
 
@@ -86,14 +88,14 @@ Persists current database state.
 
 ## **Private Members**
 
-- `wal_path_` – WAL file path
-- `snapshot_path_` – Snapshot file path
-- `valueLogFd_` – ValueLog file descriptor
-- `valuelog_path_` – ValueLog file path
-- `index_` – Key → {offset, valueSize}
-- `entries_` – Stored entry metadata
-- `tokenIndex_` – Token → posting list
-- `postings_` – Posting list storage
+- `std::unordered_map<Key, IndexEntry> index_` – key → `{offset, valueSize}` in the value log.
+- `std::vector<Entry> entries_` – stored entry metadata, including tokens.
+- `std::unordered_map<std::string, std::vector<Posting>, TransparentHash, TransparentEqual> postings_` – inverted index.
+- `size_t snapshotWriteOps_`, `size_t snapshotEveryNWriteOps_` – write counter and threshold for automatic snapshots at the engine level.
+- `size_t totalTokens_` – total number of tokens across all entries (used by the query engine).
+- `QueryEngine queryEngine_` – query execution and ranking.
+- `IndexEngine indexEngine_` – tokenization and index maintenance.
+- `StorageEngine storageEngine_` – WAL, snapshot, and value-log management.
 
 ---
 
@@ -103,3 +105,4 @@ Persists current database state.
 - Coordinates persistence
 - Ensures durability & recovery
 - Maintains inverted index
+- Exposes search over values via `QueryEngine`

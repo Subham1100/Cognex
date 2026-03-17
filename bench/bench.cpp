@@ -2,11 +2,16 @@
 // #include <chrono>
 // #include <vector>
 // #include <random>
+// #include <algorithm>
+// #include <fstream>
+// #include <sstream>
+
 // #include "cognex.h"
 
 // using Clock = std::chrono::high_resolution_clock;
 
-// static const int N = 1'0;
+// static const size_t N = 10000;
+// static const size_t QUERY_COUNT = 10000;
 
 // std::vector<std::string> dictionary = {
 //     "apple","banana","car","dog","elephant",
@@ -16,268 +21,164 @@
 //     "performance","benchmark","random","value"
 // };
 
-// std::string random_sentence(std::mt19937& rng,
-//                             int minWords = 3,
-//                             int maxWords = 12)
+// size_t memory_usage_mb()
 // {
-//     std::uniform_int_distribution<int> wordCountDist(minWords, maxWords);
-//     std::uniform_int_distribution<int> wordPick(0, dictionary.size() - 1);
+//     std::ifstream file("/proc/self/status");
+//     std::string line;
+
+//     while (std::getline(file, line))
+//     {
+//         if (line.find("VmRSS:") != std::string::npos)
+//         {
+//             std::string number;
+
+//             for (char c : line)
+//             {
+//                 if (isdigit(c))
+//                     number += c;
+//             }
+
+//             size_t kb = std::stoul(number);
+//             return kb / 1024;
+//         }
+//     }
+
+//     return 0;
+// }
+
+// std::string random_sentence(std::mt19937& rng)
+// {
+//     std::uniform_int_distribution<int> wordCountDist(3,12);
+//     std::uniform_int_distribution<int> wordPick(0,dictionary.size()-1);
 
 //     int wordCount = wordCountDist(rng);
 
 //     std::string result;
-//     result.reserve(wordCount * 8);
 
-//     for (int i = 0; i < wordCount; i++) {
+//     for(int i=0;i<wordCount;i++)
+//     {
 //         result += dictionary[wordPick(rng)];
-//         if (i != wordCount - 1)
+
+//         if(i != wordCount-1)
 //             result += " ";
 //     }
 
 //     return result;
 // }
 
-// std::string number_to_spaced_digits(int n) {
-//     std::string s = std::to_string(n);
-//     std::string result;
+// void benchmark_put(Cognex& db)
+// {
+//     std::mt19937 rng(42);
 
-//     for (char c : s) {
-//         result += c;
-//         result += ' ';
-//     }
-
-//     if (!result.empty())
-//         result.pop_back(); // remove trailing space
-
-//     return result;
-// }
-
-// void run_put_benchmark(Cognex& db) {
-//     std::cout << "\n=== PUT Benchmark ===\n";
+//     std::cout << "\n=== PUT Benchmark (Index Build) ===\n";
 
 //     auto start = Clock::now();
 
-//     for (int i = 0; i < N; i++) {
-
-//         std::string value = number_to_spaced_digits(i);
-
+//     for(size_t i=0;i<N;i++)
+//     {
 //         db.put(
-//             Key{"key" + std::to_string(i)},
-//             Value{value}
-//         );
-//     }
-
-//     auto end = Clock::now();
-
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
-
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
-// }
-
-
-// void run_get_benchmark(Cognex& db) {
-//     std::cout << "\n=== GET Benchmark ===\n";
-
-//     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> dist(0, N - 1);
-
-//     auto start = Clock::now();
-
-//     for (int i = 0; i < N; i++) {
-//         int k = dist(rng);
-//         db.get(Key{"key" + std::to_string(k)});
-//     }
-
-//     auto end = Clock::now();
-
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
-
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
-// }
-
-// void run_mixed_benchmark(Cognex& db) {
-//     std::cout << "\n=== Mixed Benchmark (50% PUT / 50% GET) ===\n";
-
-//     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> dist(0, N - 1);
-
-//     auto start = Clock::now();
-
-//     for (int i = 0; i < N; i++) {
-//         if (i % 2 == 0) {
-//             db.put(Key{"key" + std::to_string(i)},
-//                Value{"value" + std::to_string(i)});
-//         } else {
-//             int k = dist(rng);
-//            db.get(Key{"key" + std::to_string(k)});
-//         }
-//     }
-
-//     auto end = Clock::now();
-
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
-
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
-// }
-// void run_query_benchmark(Cognex& db) {
-//     std::cout << "\n=== QUERY Benchmark ===\n";
-
-//     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> digit_dist(0, 9);
-
-//     auto start = Clock::now();
-
-//     for (int i = 0; i < N; i++) {
-
-//         int digit = digit_dist(rng);
-
-//         db.query(std::to_string(digit));
-//     }
-
-//     auto end = Clock::now();
-
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
-
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
-// }
-
-// void run_put_random_benchmark(Cognex& db) {
-//     std::cout << "\n=== PUT Benchmark (Random Sentences) ===\n";
-
-//     std::mt19937 rng(42);
-
-//     auto start = Clock::now();
-
-//     for (int i = 0; i < N; i++) {
-
-//         db.put(
-//             Key{"rkey" + std::to_string(i)},
+//             Key{"key"+std::to_string(i)},
 //             Value{random_sentence(rng)}
 //         );
 //     }
 
 //     auto end = Clock::now();
 
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
+//     double seconds =
+//         std::chrono::duration<double>(end-start).count();
 
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
+//     std::cout << "Documents indexed : " << N << "\n";
+//     std::cout << "Index build time  : " << seconds << " sec\n";
+//     std::cout << "Throughput        : "
+//               << (N/seconds)
+//               << " docs/sec\n";
 // }
 
-
-// void run_get_random_benchmark(Cognex& db) {
-//     std::cout << "\n=== GET Benchmark (Random Dataset) ===\n";
-
+// void benchmark_get(Cognex& db)
+// {
 //     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> dist(0, N - 1);
+//     std::uniform_int_distribution<size_t> dist(0,N-1);
+
+//     std::cout << "\n=== GET Benchmark ===\n";
 
 //     auto start = Clock::now();
 
-//     for (int i = 0; i < N; i++) {
-//         int k = dist(rng);
-//         db.get(Key{"rkey" + std::to_string(k)});
+//     for(size_t i=0;i<QUERY_COUNT;i++)
+//     {
+//         size_t k = dist(rng);
+
+//         auto v = db.get(Key{"key"+std::to_string(k)});
+//         (void)v;
 //     }
 
 //     auto end = Clock::now();
 
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
+//     double seconds =
+//         std::chrono::duration<double>(end-start).count();
 
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
+//     std::cout << "Operations : " << QUERY_COUNT << "\n";
+//     std::cout << "Total time : " << seconds << " sec\n";
+//     std::cout << "Throughput : "
+//               << (QUERY_COUNT/seconds)
+//               << " ops/sec\n";
 // }
 
-
-// void run_mixed_random_benchmark(Cognex& db) {
-//     std::cout << "\n=== Mixed Benchmark (50% PUT / 50% GET, Random Sentences) ===\n";
-
+// void benchmark_query(Cognex& db)
+// {
 //     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> keyDist(0, N - 1);
+//     std::uniform_int_distribution<int> wordPick(0,dictionary.size()-1);
+
+//     std::cout << "\n=== QUERY Benchmark ===\n";
 
 //     auto start = Clock::now();
 
-//     for (int i = 0; i < N; i++) {
-
-//         if (i % 2 == 0) {
-//             db.put(
-//                 Key{"rkey" + std::to_string(i)},
-//                 Value{random_sentence(rng)}
-//             );
-//         }
-//         else {
-//             int k = keyDist(rng);
-
-//             db.get(
-//                 Key{"rkey" + std::to_string(k)}
-//             );
-//         }
-//     }
-
-//     auto end = Clock::now();
-
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
-
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
-// }
-
-// void run_query_random_benchmark(Cognex& db) {
-//     std::cout << "\n=== QUERY Benchmark (Random Tokens) ===\n";
-
-//     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> wordPick(0, dictionary.size() - 1);
-
-//     auto start = Clock::now();
-
-//     for (int i = 0; i < N; i++) {
-
+//     for(size_t i=0;i<QUERY_COUNT;i++)
+//     {
 //         std::string token = dictionary[wordPick(rng)];
-//         db.query(token);
+
+//         Query q;
+//         q.terms.push_back(token);
+//         q.topK = 10;
+
+//         auto r = db.query(q);
+//         (void)r;
 //     }
 
 //     auto end = Clock::now();
 
-//     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-//     double seconds = duration.count() / 1000.0;
+//     double seconds =
+//         std::chrono::duration<double>(end-start).count();
 
-//     std::cout << "Ops: " << N << "\n";
-//     std::cout << "Time: " << seconds << " sec\n";
-//     std::cout << "Throughput: " << (N / seconds) << " ops/sec\n";
+//     std::cout << "Queries     : " << QUERY_COUNT << "\n";
+//     std::cout << "Total time  : " << seconds << " sec\n";
+//     std::cout << "Throughput  : "
+//               << (QUERY_COUNT/seconds)
+//               << " queries/sec\n";
 // }
 
+// int main()
+// {
+//     std::cout << "Starting Cognex Benchmarks\n";
 
-// int main() {
-//     Cognex db(WalPath{"wal.log"}, SnapshotPath{"snapshot.dat"},ValueLogPath{"value.log"});
-//     std::cout << "Starting Cognex Benchmarks...\n";
+//     Cognex db(
+//         WalPath{"wal.log"},
+//         SnapshotPath{"snapshot.dat"},
+//         ValueLogPath{"value.log"}
+//     );
 
-//     // 🔴 Worst-case inverted index stress
-//     run_put_benchmark(db);
-//     run_get_benchmark(db);
-//     run_mixed_benchmark(db);
-//     run_query_benchmark(db);
+//     std::cout << "\nDataset target size: "
+//               << N
+//               << " documents\n";
 
-//     // 🟢 Realistic workload
-//     run_put_random_benchmark(db);
-//     run_get_random_benchmark(db);
-//     run_query_random_benchmark(db);
+//     benchmark_put(db);
+//     benchmark_get(db);
+//     benchmark_query(db);
 
-//     std::cout << "\nBenchmarks complete.\n";
+//     std::cout << "\nMemory usage: "
+//               << memory_usage_mb()
+//               << " MB\n";
+
+//     std::cout << "\nBenchmarks complete\n";
+
 //     return 0;
 // }

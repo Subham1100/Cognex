@@ -1,58 +1,44 @@
-# Cognex
+# Cognex Documentation
 
-Cognex is a lightweight **key–value database** designed with a focus on **simplicity, clarity, and crash-safe persistence**.
+This directory contains the structured documentation for Cognex.
 
-It is built as an educational and experimental system to explore core database concepts such as **storage engines**, **Write-Ahead Logging (WAL)**, and **snapshot-based recovery**.
+For a high‑level introduction to the project, see:
 
----
-
-## Overview
-
-Cognex is a minimal database implementation supporting essential key–value operations while demonstrating real-world **durability** and **recovery mechanisms**.
-
-This project prioritizes understanding over abstraction, making database internals easy to study and extend.
+- `overview.md` – conceptual overview and feature list.
+- Root‑level `README.md` – project description, quickstart, and benchmarks.
 
 ---
 
-## Key Features
+## Contents
 
-- **Basic key–value storage**
-- **Deterministic write path**
-- **Write-Ahead Log (WAL) durability**
-- **Snapshot-based recovery**
-- **Readable and understandable internals**
+- **Overview and Architecture**
+  - `overview.md` – what Cognex is and what it provides.
+  - `architecture.md` – core components, flows, and durability model.
+  - `internals.md` – write, read, and recovery paths at a glance.
 
----
+- **Engine Internals**
+  - `storage-engine.md` – value log, WAL/snapshot integration, recovery.
+  - `indexing.md` – tokenization and inverted index structures.
+  - `query-engine.md` – query model, ranking, and filters.
+  - `storage.md` – high‑level storage behavior.
+  - `wal.md` – WAL format and replay.
+  - `snapshot.md` – snapshot behavior and trade‑offs.
 
-## Design Philosophy
+- **Usage and Interface**
+  - `guide.md` – getting started and example CLI sessions.
+  - `cli.md` – REPL, parsing, and command semantics.
+  - `api.md` – DB/Persistence interfaces, WAL/snapshot APIs, and query engine entrypoints.
 
-Cognex prioritizes:
+- **Performance and Versions**
+  - `benchmarks.md` – benchmark harness and current results.
+  - `v3.md` – historical notes about earlier benchmark numbers.
 
-- **Simplicity over feature bloat**
-- **Clarity over complexity**
-- **Predictable crash recovery**
-- **Clean separation of components**
+- **Reference Types and Classes**
+  - `classes.md` – main classes and their responsibilities.
+  - `types.md` – core data structures used across the engine.
 
----
+- **Development**
+  - `development.md` – building, running, and contribution guidelines.
+  - `server.md` – notes on the (currently absent) server component and future TODOs.
 
-## Core Components
-
-### **Storage Engine**
-Manages key–value data in memory and coordinates persistence.
-
-### **Write-Ahead Log (WAL)**
-Ensures durability by recording mutations before applying them.
-
-### **Snapshot Manager**
-Periodically persists full database state for faster recovery.
-
----
-
-## Current Scope
-
-- String keys  
-- String values  
-- `PUT`, `GET`, `DEL` operations  
-- WAL-based durability  
-- Snapshot-based recovery  
-
+All documents are kept in sync with the current implementation; if you change the code, please update the corresponding files here.

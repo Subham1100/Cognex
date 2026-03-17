@@ -1,91 +1,184 @@
 # API Reference
 
-This document describes the public interfaces exposed by Cognex.
+This document describes the public interfaces exposed by Cognex, as implemented in the current codebase.
 
-## Database Commands
+---
 
-`PUT <key> <value>`
-Stores or updates a key–value pair.
+## Database Commands (CLI)
 
-Creates key if missing
+Commands are parsed by the CLI (`parser`, `CommandRegistry`, `ICommand` implementations) and executed against a `Cognex` instance:
 
-Overwrites value if key exists
+- **`PUT "<key>" "<value>"`**
+  - Stores or updates a key–value pair.
+  - Creates the key if missing.
+  - Overwrites the existing value if the key already exists.
 
-`GET <key>`
-Retrieves value associated with a key.
+- **`GET "<key>"`**
+  - Retrieves the value associated with a key.
+  - On success: prints the stored value.
+  - On missing key: prints `[NIL]`.
 
-Returns value if present
+- **`DEL "<key>"`**
+  - Deletes a key from storage.
+  - No error is thrown if the key does not exist.
 
-Returns empty result if missing
+- **`QUERY "<terms>" [filters…]`**
+  - Performs a full‑text search over values using the inverted index.
+  - The first quoted argument is split on whitespace into one or more search terms.
+  - Optional additional arguments are filters, for example:
+    - `relevance >= 2`
+    - `similarity > 50`
+    - `top = 20`
+    - `sortby similarity`
+  - Matching entries are printed with:
+    - `entryId`
+    - `key`
+    - `relevance`
+    - `similarity`
 
-`DEL <key>`
-Deletes a key from storage.
+- **`SNAPSHOT`**
+  - Triggers `Cognex::snapshot()` to persist the current key index to disk and truncate the WAL.
 
-Returns success status
+- **`HELP`**
+  - Prints available commands.
 
-`SNAPSHOT`
-Creates a snapshot of the current database state.
+- **`EXIT`**
+  - Exits the REPL loop.
 
-`HELP`
-Displays supported commands.
+See `cli/` sources and `docs/cli.md` for details.
 
-`EXIT`
-Gracefully shuts down Cognex.
+---
 
-## WAL Functions
+## DB and Persistence Interfaces
 
-`append_and_fsync`
-Appends a record to the WAL and ensures durability.
+Defined in `core/db.h`:
 
-Signature:
-```void append_and_fsync(const WalPath& path, const std::string& record);```
+```cpp
+struct DB {
+    virtual ~DB() = default;
 
-Purpose:
+    virtual void put(Key key, Value value) = 0;
+    virtual std::optional<Value> get(const Key& key) const = 0;
+    virtual bool del(const Key& key) = 0;
+};
 
-Guarantees persistence before applying mutations
+struct Persistence {
+    virtual ~Persistence() = default;
 
-`wal_replay`
-Replays WAL records sequentially.
+    virtual void recover() = 0;
+    virtual void snapshot() = 0;
+};
+```
 
-Signature:
-```bool wal_replay(const WalPath& path, void(*apply)(const std::string_view& record));```
+`class Cognex` implements both `DB` and `Persistence`.
 
-Behavior:
+---
 
-Reads log entries
+## WAL API
 
-Invokes callback for each record
+Implemented in `storage/wal.h` and `storage/wal.cpp`:
 
-Returns success/failure
+- **`append_and_fsync`**
 
-`wal_truncate`
-Clears WAL contents.
+  Appends a record to the WAL and periodically fsyncs the file:
 
-Signature:
-```void wal_truncate(const WalPath& path);```
+  ```cpp
+  void append_and_fsync(const WalPath& path,
+                        const std::string& record,
+                        size_t& walWrites_,
+                        size_t& walFsyncEveryNWrites_);
+  ```
 
-Purpose:
+  - Writes:
+    - `uint32_t len`
+    - `len` bytes of `record`
+    - `uint32_t checksum` (CRC32 of `record`)
+  - Increments `walWrites_` and calls `fsync` when it reaches `walFsyncEveryNWrites_`.
 
-Typically used after snapshot creation
+- **`wal_replay`**
 
-## Snapshot Functions
+  Template function that replays WAL records sequentially:
 
-`write_snapshot_atomic`
-Writes snapshot safely using atomic replacement.
+  ```cpp
+  template<typename ApplyFn>
+  bool wal_replay(const WalPath& path, ApplyFn apply);
+  ```
 
-Signature:
-```void write_snapshot_atomic(const SnapshotPath& path, const std::unordered_map<Key,Value>& store);```
+  - Reads:
+    - `len`
+    - `record` (length `len`)
+    - `checksum`
+  - Validates the checksum with `crc32_str(record)`.
+  - Invokes `apply(std::string_view(record))` for each valid record.
 
-Purpose:
+- **`wal_truncate`**
 
-Prevents partial/corrupt snapshots
+  Truncates the WAL file and fsyncs it:
 
-`load_snapshot`
-Loads snapshot into memory.
+  ```cpp
+  void wal_truncate(const WalPath& path);
+  ```
 
-Signature:
-```void load_snapshot(const SnapshotPath& path, std::unordered_map<Key,Value>& store);```
+  Used after a successful snapshot to reset the WAL.
 
-Behavior:
+---
 
-Restores persisted database state
+## Snapshot API
+
+Implemented in `storage/snapshot.h`:
+
+- **`write_snapshot_atomic`**
+
+  Writes a snapshot of the in‑memory index using atomic replacement:
+
+  ```cpp
+  void write_snapshot_atomic(
+      const SnapshotPath& path,
+      const std::unordered_map<Key, IndexEntry>& index_);
+  ```
+
+  - Persists the mapping `Key → IndexEntry{offset, valueSize}`.
+  - **Note:** previous versions wrote `Key → Value`; current implementation writes the index only.
+
+- **`load_snapshot`**
+
+  Loads a snapshot into the in‑memory index:
+
+  ```cpp
+  void load_snapshot(
+      const SnapshotPath& path,
+      std::unordered_map<Key, IndexEntry>& index_);
+  ```
+
+  - Restores the key index used for value‑log lookups.
+
+Snapshots are consumed by `StorageEngine::recover` and coordinated by `Cognex::recover`.
+
+---
+
+## Query Engine API (High‑Level)
+
+Defined in `query/query_engine.h`:
+
+```cpp
+class QueryEngine {
+public:
+    std::vector<QueryResult> execute(
+        const Query& query,
+        const std::unordered_map<std::string,
+                                 std::vector<Posting>,
+                                 TransparentHash,
+                                 TransparentEqual>& postings_,
+        size_t totalDocs,
+        size_t totalTokens_,
+        const std::vector<Entry>& entries_) const;
+};
+```
+
+The main entrypoint is `execute`, which:
+
+- Generates candidates from the inverted index (`postings_`).
+- Applies filters from `Query::filters`.
+- Ranks and selects top‑K results according to `Query::sortBy` and `Query::topK`.
+
+See `docs/query-engine.md` for a detailed description of the query model and ranking behavior.
