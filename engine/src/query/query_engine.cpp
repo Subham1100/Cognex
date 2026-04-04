@@ -7,8 +7,7 @@
 // IDF Helper Function - How rare a word is across all documents.
 double compute_idf(size_t totalDocs, size_t df)
 {
-    if (df == 0) return 0.0;
-    return std::log((double)totalDocs / df);
+    return std::log((totalDocs - df + 0.5) / (df + 0.5) + 1.0);
 }
 
 
@@ -51,20 +50,19 @@ void QueryEngine::generate_candidates(
     // if a id contain both the terms it will be added twice with frequency 1
     // so we store a temp map to mark frequency of a entryId with terms in the args
 
-
-    if (termFrequencyScoresBuffer_.size() < entries_.size())
+    if (ctx.termFrequencyScoresBuffer_.size() < entries_.size())
     {
     // raw term-frequency based relevance score (used for filters / legacy ranking)
-        termFrequencyScoresBuffer_.resize(entries_.size(), 0);
+        ctx.termFrequencyScoresBuffer_.resize(entries_.size(), 0);
     // similarity score using BM25 ranking
-        bm25ScoresBuffer_.resize(entries_.size(), 0.0);
+        ctx.bm25ScoresBuffer_.resize(entries_.size(), 0.0);
     }
 
-    touchedDocs_.clear();
+    ctx.touchedDocs_.clear();
 
 
     // Track only documents touched by the query
-    touchedDocs_.reserve(1024);
+    ctx.touchedDocs_.reserve(1024);
 
     ctx.results.reserve(1024);
 
@@ -94,16 +92,20 @@ void QueryEngine::generate_candidates(
         // then we store it in BM25Scores[entryId] -> BM25contribution
         for (const auto& posting : postingsForTerm)
         {
+            //skip the deleted entry
+            const Entry& entry = entries_[posting.entryId];
+            if (entry.isDeleted) continue;
+
             size_t docId = posting.entryId;
 
             // First time we see this doc → record it
-            if (termFrequencyScoresBuffer_[docId] == 0)
-                touchedDocs_.push_back(docId);
+            if (ctx.termFrequencyScoresBuffer_[docId] == 0)
+                ctx.touchedDocs_.push_back(docId);
 
             // TF = how many times term appears in document
             size_t termFrequency = posting.frequency;
 
-            termFrequencyScoresBuffer_[docId] += termFrequency;
+            ctx.termFrequencyScoresBuffer_[docId] += termFrequency;
 
             // |D| = length of document in tokens
             // used by BM25 to penalize long documents
@@ -121,7 +123,7 @@ void QueryEngine::generate_candidates(
                 inverseDocumentFrequency);
 
             // accumulate similarity score
-            bm25ScoresBuffer_[docId] += bm25Contribution;
+            ctx.bm25ScoresBuffer_[docId] += bm25Contribution;
         }
     }
 
@@ -129,24 +131,24 @@ void QueryEngine::generate_candidates(
     // Find max BM25 score only among touched docs
     double maxScore = 0.0;
 
-    for (size_t docId : touchedDocs_)
+    for (size_t docId : ctx.touchedDocs_)
     {
-        double score = bm25ScoresBuffer_[docId];
+        double score = ctx.bm25ScoresBuffer_[docId];
         if (score > maxScore)
             maxScore = score;
     }
 
     // convert temporary score maps into QueryResult objects
-    for (size_t docId : touchedDocs_)
+    for (size_t docId : ctx.touchedDocs_)
     {
         QueryResult result;
 
         result.entryId = docId;
 
         // raw TF relevance (useful for filters like relevance > X)
-        result.relevance = termFrequencyScoresBuffer_[docId];
+        result.relevance = ctx.termFrequencyScoresBuffer_[docId];
 
-        double score = bm25ScoresBuffer_[docId];
+        double score = ctx.bm25ScoresBuffer_[docId];
         if (maxScore > 0)
         score = (score / maxScore) * 100.0;
 
@@ -157,10 +159,10 @@ void QueryEngine::generate_candidates(
     }
 
     // Reset buffers only for touched docs
-    for (size_t docId : touchedDocs_)
+    for (size_t docId : ctx.touchedDocs_)
     {
-        termFrequencyScoresBuffer_[docId] = 0;
-        bm25ScoresBuffer_[docId] = 0.0;
+        ctx.termFrequencyScoresBuffer_[docId] = 0;
+        ctx.bm25ScoresBuffer_[docId] = 0.0;
     }
 }
 

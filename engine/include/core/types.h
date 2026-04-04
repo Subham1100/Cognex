@@ -54,6 +54,7 @@ struct Entry // contains information about the PUT entry -> key,value,tokens
     Key key;
     Value value;
     std::vector<std::string> tokens;
+    bool isDeleted = false; // we will skip this in queries and will delete it.
 
     explicit Entry(size_t entryId_,Key key_, Value value_, std::vector<std::string>tokens_)
     :entryId(entryId_),
@@ -174,6 +175,9 @@ struct QueryContext
 {
     const Query& query;
     std::vector<QueryResult> results;
+    std::vector<size_t> termFrequencyScoresBuffer_;
+    std::vector<double> bm25ScoresBuffer_;
+    std::vector<size_t> touchedDocs_;
 };
 
 struct FilterExpr

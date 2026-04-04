@@ -28,9 +28,9 @@ private:
 
     void apply_topk(QueryContext& ctx) const;
 
-    //------ mutables ------------------
-    mutable std::vector<size_t> termFrequencyScoresBuffer_;
-    mutable std::vector<double> bm25ScoresBuffer_;
-    mutable std::vector<size_t> touchedDocs_;
+    // //------ mutables ------------------
+    // mutable std::vector<size_t> termFrequencyScoresBuffer_;
+    // mutable std::vector<double> bm25ScoresBuffer_;
+    // mutable std::vector<size_t> touchedDocs_;
 
 };

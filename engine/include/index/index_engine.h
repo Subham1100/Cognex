@@ -14,6 +14,7 @@ public:
     void insert(Key key,
                 Value value,
                 std::vector<Entry>& entries_,
+                std::unordered_map<Key, size_t>& keyToEntry_,
                 std::unordered_map<std::string,
                                    std::vector<Posting>,
                                    TransparentHash,

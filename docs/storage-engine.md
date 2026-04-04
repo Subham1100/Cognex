@@ -206,11 +206,11 @@ High‑level flows:
 
 - **DEL**
   - `append_wal_record("DEL key")`
-  - Remove key from `index_`.
+  - Remove key from `index_` (and update search-related state in `Cognex`; see `Cognex::del` / `compact`).
 
 - **recover**
   - `StorageEngine::recover` restores `index_` from snapshot + WAL.
   - `Cognex::recover` reads values back from the value log and rebuilds the inverted index.
 
-**TODO:** Value‑log compaction / garbage collection is not implemented; deleted or superseded values remain in `value.log`.
+**Compaction:** `Cognex::compact()` (and the CLI `COMPACT` command) rebuild in-memory `entries_` / `postings_` after deletes. **On-disk** value log compaction is not implemented; deleted or superseded value bytes remain in `value.log`.
 

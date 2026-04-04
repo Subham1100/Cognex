@@ -72,6 +72,7 @@ If parsing fails, `parse_line` returns `std::nullopt` and the REPL prints `[ERR 
 - `HELP` → `HelpCommand`
 - `EXIT` → `ExitCommand`
 - `QUERY` → `QueryCommand`
+- `COMPACT` → `CompactCommand`
 
 On command resolution:
 
@@ -126,9 +127,27 @@ DEL "<key>"
 **Behavior**
 
 - Calls `Cognex::del(Key{key})`.
-- Records a `DEL` record in the WAL and erases the key from the in‑memory index.
-- Does not reclaim space in the value log (**TODO:** compaction not implemented).
+- Records a `DEL` record in the WAL and erases the key from the in‑memory key index.
+- Marks the corresponding `Entry` as deleted for search and may trigger `Cognex::compact()` automatically after a fixed number of deletes (see `compactionDeleteThreshold_` in `cognex.h`).
+- Does **not** shrink `value.log` on disk; obsolete bytes remain in the append‑only value log.
 - Increments `write_count` for REPL auto‑snapshot logic.
+
+---
+
+### COMPACT
+
+**Syntax**
+
+```text
+COMPACT
+```
+
+**Behavior**
+
+- Calls `Cognex::compact()`.
+- Rebuilds in‑memory `entries_`, `postings_`, `keyToEntry_`, and `totalTokens_` by dropping tombstoned entries (`isDeleted`) and reassigning contiguous entry IDs.
+- Does not rewrite the WAL, snapshot, or value log; it is an in‑process cleanup of search structures only.
+- Does not increment `write_count` (no automatic snapshot side effect from this command alone).
 
 ---
 

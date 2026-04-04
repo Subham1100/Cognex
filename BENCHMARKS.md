@@ -1,192 +1,118 @@
 ## Benchmarks
 
-This document describes the benchmark harness in `bench/bench.cpp` and the results for a 10,000‑document workload.
-
-All numbers below are taken from the specified code and the provided measurements; environment‑specific details (CPU, RAM, disk type) are not encoded in the codebase and are therefore omitted.  
-**TODO:** capture and record hardware / OS details alongside benchmark runs.
+This document describes the **`cognex_bench`** harness (`bench/bench.cpp`), how results are produced, and a **sample run** on one machine. Your numbers will differ by CPU, disk, and OS load.
 
 ---
 
-## 1. Benchmark Harness Overview
+## 1. How we benchmark (methodology and criteria)
 
-The benchmark binary (`bench/bench.cpp`) exercises the `Cognex` engine directly:
+### 1.1 Executable and data layout
 
-- Constructs a `Cognex` instance with:
-  - `WalPath{"wal.log"}`
-  - `SnapshotPath{"snapshot.dat"}`
-  - `ValueLogPath{"value.log"}`
-- Uses:
-  - `N = 10000` documents.
-  - `QUERY_COUNT = 10000` operations for GET and QUERY benchmarks.
-- Generates random values using a fixed in‑memory dictionary:
-  - Example terms: `apple`, `banana`, `database`, `engine`, `search`, `wal`, `performance`, `benchmark`, etc.
-  - `random_sentence` picks 3–12 words per document, joined with spaces.
-- Measures latency with `std::chrono::high_resolution_clock`.
-- Reports:
-  - Total time in seconds.
-  - Throughput computed as `operations / seconds`.
-- Approximates memory usage (on Linux) by reading `/proc/self/status` and extracting `VmRSS`.
+- Build target: **`cognex_bench`** (see root `CMakeLists.txt`).
+- Persistence files live under a dedicated directory (default **`bench_data/`** relative to the process working directory):
+  - `wal.log`, `snapshot.dat`, `value.log`
+- By default the harness **deletes** those three files before each run, then constructs `Cognex` and calls **`recover()`** so the run starts from an empty on-disk state (no stale WAL/snapshot skew).
 
-Three workloads are measured:
+### 1.2 Parameters (defaults)
 
-1. **PUT benchmark** – `benchmark_put`
-2. **GET benchmark** – `benchmark_get`
-3. **QUERY benchmark** – `benchmark_query`
+| Parameter | Default | Meaning |
+|-----------|---------|---------|
+| `docs` | `10000` | Keys `key0` … `key{docs-1}` inserted in PUT phase |
+| `query_count` | `10000` | Number of GET operations and number of QUERY operations |
+| `seed` | `42` | `std::mt19937` seed for reproducible synthetic values and random key/query choices |
+| `data_dir` | `bench_data` | Directory for WAL / snapshot / value log |
 
----
+CLI: `./build/cognex_bench [docs] [query_count] [seed] [data_dir]`
 
-## 2. Workloads
+### 1.3 What is measured (criteria)
 
-### 2.1 PUT Benchmark – Index Build
+- **Clock:** wall time via `std::chrono::high_resolution_clock` around each phase (not CPU time, not per-op latency percentiles).
+- **Throughput:** `operations / elapsed_seconds` for that phase only.
+- **Time split:** each phase’s wall time as a percentage of **PUT + GET + QUERY** total for that run (shows where end-to-end time goes in this harness).
+- **Memory:** approximate **resident set size** after all phases — Linux: `VmRSS` from `/proc/self/status` (reported in MB); macOS: `mach_task_basic_info.resident_size` (reported in MB). This is a rough footprint hint, not a rigorous allocator profile.
 
-Function: `benchmark_put(Cognex& db)`
+### 1.4 What is *not* measured
 
-- For `i` from `0` to `N - 1`:
-  - Key: `"key" + std::to_string(i)`
-  - Value: random sentence from the dictionary (3–12 tokens).
-- Operations:
-  - `db.put(Key{...}, Value{...})`
-- Measures:
-  - Time to index `N` documents.
-  - Throughput in docs/sec.
+- Multi-threaded or concurrent access.
+- CLI parsing, network, or mixed interleaved workloads.
+- Cold vs warm OS page cache (unless you change reuse of `data_dir` or run order).
+- Statistical distribution across many runs (single run unless you script repeats).
 
-What this measures:
+### 1.5 Synthetic workload definition
 
-- End‑to‑end **write path performance**, including:
-  - WAL append (with batched `fsync`).
-  - Value log append (header + value + checksum).
-  - In‑memory index update (`index_`).
-  - Tokenization and inverted index updates via `IndexEngine`.
+- **Dictionary:** fixed token list in `bench/bench.cpp` (e.g. `apple`, `database`, `engine`, `search`, `wal`, `snapshot`, `performance`, `benchmark`, …).
+- **Values:** each PUT value is **`random_sentence`**: 3–12 tokens chosen uniformly from the dictionary, space-separated.
+- **PUT:** for `i ∈ [0, docs)`, `db.put(Key{"key" + std::to_string(i)}, Value{random_sentence(rng)})`.
+- **GET:** `query_count` times, uniform random `k ∈ [0, docs-1)`, `db.get(Key{"key" + std::to_string(k)})`, result discarded.
+- **QUERY:** `query_count` times, uniform random token from dictionary, `Query` with that single term and **`topK = 10`**, `db.query(q)`, results discarded.
 
-### 2.2 GET Benchmark – Point Lookups
-
-Function: `benchmark_get(Cognex& db)`
-
-- Uses a uniform distribution over `0..N-1`:
-  - Picks random keys of the form `"key" + k`.
-- For `i` from `0` to `QUERY_COUNT - 1`:
-  - Calls `db.get(Key{...})`.
-- Discards the value (only measures latency).
-
-What this measures:
-
-- **Direct key retrieval performance**:
-  - Hash map lookup in `index_`.
-  - Offset‑based read from the value log using `StorageEngine::read_from_log_`.
-
-### 2.3 QUERY Benchmark – Token Search
-
-Function: `benchmark_query(Cognex& db)`
-
-- Picks random tokens from the same dictionary used for values.
-- For each of `QUERY_COUNT` iterations:
-  - Builds a `Query`:
-    - Single term in `q.terms`.
-    - `topK = 10`.
-  - Calls `db.query(q)`.
-- Discards results after issuing the query.
-
-What this measures:
-
-- **Search performance over the inverted index**, including:
-  - Posting list lookups (`postings_`).
-  - Candidate generation and BM25 scoring.
-  - Filtering (if filters are set on the query; the benchmark uses only the default).
-  - Ranking and top‑K selection.
+Criteria in plain language: we measure **single-threaded bulk insert**, then **random point reads** on an existing corpus, then **single-term search** with fixed top-K, all on **synthetic text** with a small vocabulary (posting lists can grow large for common tokens).
 
 ---
 
-## 3. Results (10,000 Documents)
+## 2. Workloads (what each phase stresses)
 
-Dataset size: **10,000 documents**  
-All results below are for single‑threaded execution of the benchmark harness.
+### 2.1 PUT — index / write path
 
-### 3.1 Summary Table
+- WAL append (batched `fsync` in engine code).
+- Value log append (header + value + checksum).
+- `index_` update; `IndexEngine` tokenization and `postings_` updates.
 
-| Benchmark | Operations / Documents | Total Time (sec) | Throughput              | What it measures                                   |
-|----------:|------------------------|------------------|-------------------------|----------------------------------------------------|
-| **PUT**   | 10,000 documents       | 0.995196         | 10,048 docs/sec         | Indexing / document insertion performance          |
-| **GET**   | 10,000 operations      | 0.0240313        | 416,124 ops/sec         | Direct key retrieval performance                   |
-| **QUERY** | 10,000 queries         | 4.55477          | 2,195 queries/sec       | Search performance over the inverted index         |
+### 2.2 GET — point lookup path
 
-### 3.2 PUT Benchmark Details
+- Hash lookup in `index_`.
+- Offset-based read from value log + checksum verification.
 
-- **Documents indexed**: 10,000  
-- **Index build time**: 0.995196 sec  
-- **Throughput**: 10,048 docs/sec  
+### 2.3 QUERY — search path
 
-Interpretation:
-
-- Reflects the combined cost of:
-  - WAL logging and periodic `fsync`.
-  - Value log appends with checksums.
-  - Tokenization and updates to `entries_` and `postings_`.
-- For larger datasets or different hardware, throughput will vary; the code does not embed environment info.
-
-### 3.3 GET Benchmark Details
-
-- **Operations**: 10,000  
-- **Total time**: 0.0240313 sec  
-- **Throughput**: 416,124 ops/sec  
-
-Interpretation:
-
-- Shows that point lookups are effectively bound by:
-  - Hash map lookup in `index_`.
-  - A single `pread` of the value record.
-- No additional work is performed in the search index for this workload.
-
-### 3.4 QUERY Benchmark Details
-
-- **Queries**: 10,000  
-- **Total time**: 4.55477 sec  
-- **Throughput**: 2,195 queries/sec  
-
-Interpretation:
-
-- Each query:
-  - Touches the postings list for a random token.
-  - Accumulates BM25 scores across all matching documents.
-  - Normalizes and ranks results, then returns top‑K (10).
-- Performance depends on:
-  - Token distribution in generated documents.
-  - Size of postings lists for frequently occurring terms.
+- Posting list lookup for the term.
+- BM25-style scoring over matching documents, normalize, rank, top-K.
 
 ---
 
-## 4. How to Reproduce
+## 3. Sample results (10,000 documents, 10,000 GET, 10,000 QUERY)
 
-Build and run the benchmark binary (exact commands depend on your CMake configuration).
+Recorded from **`./build/cognex_bench`** with defaults (`docs=10000`, `query_count=10000`, `seed=42`, `dir=bench_data`).  
+**Environment was not captured in the tool** — treat as one reference point, not a guarantee.
 
-Example outline:
+### 3.1 Summary table
+
+| Benchmark | Operations / documents | Total time (s) | Throughput | Time split (of PUT+GET+QUERY) |
+|-----------|-------------------------|----------------|------------|-------------------------------|
+| **PUT**   | 10,000 documents        | 0.527247       | 18,966 docs/s | 6.65%                      |
+| **GET**   | 10,000 operations       | 0.025308       | 395,138 ops/s | 0.32%                      |
+| **QUERY** | 10,000 queries          | 7.375877       | 1,356 queries/s | 93.03%                  |
+
+**End-to-end wall time (three phases):** ~7.93 s  
+**Approximate RSS after run:** 9 MB  
+
+### 3.2 Interpretation
+
+- **QUERY dominates** this harness (~93% of phase time): posting traversal + BM25 + ranking on a 10k-doc corpus with a small dictionary drives cost.
+- **GET** remains cheap: mostly index lookup + one value read per op.
+- **PUT** sits in between: durability + indexing per document.
+
+---
+
+## 4. How to reproduce
 
 ```bash
-# From the project root (exact commands may vary)
 cmake -S . -B build
-cmake --build build --config Release
-
-# Then run the benchmark executable produced from bench/bench.cpp
-./build/bench   # TODO: replace with the actual binary name / path
+cmake --build build --target cognex_bench --config Release
+./build/cognex_bench
 ```
 
-**TODO:** document the exact CMake target name for the benchmark once it is standardized in `CMakeLists.txt`.
+Custom size / seed / directory:
 
-The benchmark will:
-
-- Create / reuse `wal.log`, `snapshot.dat`, and `value.log` in the working directory.
-- Print PUT, GET, and QUERY statistics.
-- Print an approximate memory usage in MB at the end (Linux only, via `/proc/self/status`).
+```bash
+./build/cognex_bench 50000 50000 42 bench_run2
+```
 
 ---
 
-## 5. Future Benchmarking Work
+## 5. Future benchmarking work
 
-The current harness focuses on a simple, single‑threaded scenario.  
-Potential extensions (**not implemented yet**):
-
-- Vary dataset sizes (e.g., 100k, 1M, 10M documents).
-- Separate warm‑cache vs. cold‑cache GET benchmarks.
-- Add mixed workloads (e.g., combined PUT/GET/QUERY ratios).
-- Run under different durability settings (tuning WAL / value log fsync frequencies).
-- Capture detailed environment metadata with each run (CPU model, cores, disk type, OS).
-
+- Record **CPU model, core count, RAM, disk type, OS** next to each published table.
+- Multiple runs with **median / p95** wall time.
+- Larger `docs`, mixed PUT/GET/QUERY ratios, optional reuse of `data_dir` for warm-cache GET.
+- Tune WAL / value-log `fsync` thresholds and re-benchmark.

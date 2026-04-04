@@ -5,7 +5,7 @@ Cognex is a lightweight persistent key–value database designed around a log-st
 ## Core Components
 
 - Command Layer
-Parses and executes user commands (PUT / GET / DEL / QUERY)
+Parses and executes user commands (`PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `COMPACT`, …)
 
 - Storage Engine
 Coordinates writes, reads, and indexing

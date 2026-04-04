@@ -18,7 +18,7 @@ For a deeper, implementation-level description see `storage-engine.md`.
 
 - **PUT** – Insert or overwrite a value for a key.
 - **GET** – Retrieve the value for a key.
-- **DEL** – Remove a key (and its index entry).
+- **DEL** – Remove a key (and its index entry; search entries may be tombstoned and compacted in memory).
 
 ---
 
@@ -30,8 +30,9 @@ For a deeper, implementation-level description see `storage-engine.md`.
 - `GET`:
   - Uses the in‑memory index to locate the value on disk and reads it by offset.
 - `DEL`:
-  - Records a delete in the WAL and removes the key from the in‑memory index.
-  - Space in the value log is not reclaimed (no compaction yet). **TODO: document compaction when implemented.**
+  - Records a delete in the WAL and removes the key from the in‑memory key index.
+  - In-memory search structures can be compacted via `Cognex::compact()` (also triggered automatically after a number of deletes, and via the `COMPACT` CLI command).
+  - Space in the on-disk value log is still not reclaimed; **value log GC remains TODO.**
 
 ---
 

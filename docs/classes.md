@@ -57,9 +57,22 @@ Retrieves value associated with a key.
 Deletes a key from the index.
 
 - Records a `DEL` mutation in the WAL.
-- Removes the index entry if present and returns `true`; otherwise returns `false`.
+- Marks the search `Entry` as deleted when applicable and may invoke `compact()` automatically after `compactionDeleteThreshold_` deletes.
+- Removes the key from `index_` if present and returns `true`; otherwise returns `false`.
 
 ---
+
+### `compact()`
+
+Rebuilds in-memory search structures after deletes:
+
+- Drops entries with `isDeleted == true` from `entries_`.
+- Rebuilds `postings_`, `keyToEntry_`, and `totalTokens_` with new contiguous `entryId` values.
+
+Does not modify the WAL, snapshot, or on-disk value log.
+
+---
+
 ### `query(const Query& query) -> std::vector<QueryResult>`
 
 Executes a full-text query over stored values.
@@ -92,6 +105,7 @@ Persists current database state.
 - `std::vector<Entry> entries_` – stored entry metadata, including tokens.
 - `std::unordered_map<std::string, std::vector<Posting>, TransparentHash, TransparentEqual> postings_` – inverted index.
 - `size_t snapshotWriteOps_`, `size_t snapshotEveryNWriteOps_` – write counter and threshold for automatic snapshots at the engine level.
+- `size_t deleteOpsSinceLastCompaction_`, `size_t compactionDeleteThreshold_` – delete counter and threshold for automatic in-memory compaction.
 - `size_t totalTokens_` – total number of tokens across all entries (used by the query engine).
 - `QueryEngine queryEngine_` – query execution and ranking.
 - `IndexEngine indexEngine_` – tokenization and index maintenance.

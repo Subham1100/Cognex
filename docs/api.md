@@ -39,6 +39,9 @@ Commands are parsed by the CLI (`parser`, `CommandRegistry`, `ICommand` implemen
 - **`SNAPSHOT`**
   - Triggers `Cognex::snapshot()` to persist the current key index to disk and truncate the WAL.
 
+- **`COMPACT`**
+  - Calls `Cognex::compact()` to compact in‑memory search structures (drop tombstoned entries, rebuild postings). Does not reclaim space in `value.log`.
+
 - **`HELP`**
   - Prints available commands.
 
@@ -71,6 +74,11 @@ struct Persistence {
 ```
 
 `class Cognex` implements both `DB` and `Persistence`.
+
+Additional engine method (not part of `DB` / `Persistence`):
+
+- **`void compact()`**
+  - Rebuilds `entries_`, `postings_`, `keyToEntry_`, and `totalTokens_` after deletes. See `docs/cli.md` and `docs/storage-engine.md`.
 
 ---
 

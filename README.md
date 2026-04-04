@@ -30,9 +30,9 @@ Cognex is designed to explore database internals — durability, crash recovery,
   - Append‑only value log with checksummed records.
   - Periodic snapshots of the key index to bound recovery time.
 - **Key–value API**
-  - `PUT <key> <value>`
-  - `GET <key>`
-  - `DEL <key>`
+  - `PUT "key" "value"`
+  - `GET "key"`
+  - `DEL "key"`
 - **Search API**
   - Tokenizes values into terms.
   - Builds an **inverted index** from tokens → posting lists.
@@ -40,8 +40,11 @@ Cognex is designed to explore database internals — durability, crash recovery,
 - **Efficient reads**
   - In‑memory hash index `Key → {offset, valueSize}`.
   - Offset‑based reads from the value log using `pread`.
+- **Search index compaction**
+  - After enough deletes, or via the `COMPACT` command, Cognex drops tombstoned entries and rebuilds `entries_` / `postings_` with fresh sequential entry IDs (see `Cognex::compact()`).
+  - The on-disk value log is still append-only; dead records are not removed from `value.log` yet.
 - **CLI / REPL**
-  - Interactive prompt for issuing commands.
+  - Interactive prompt for issuing commands (`PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `COMPACT`, `HELP`, `EXIT`).
 - **Crash recovery**
   - Snapshot load → WAL replay → re‑index for search.
 
@@ -109,24 +112,27 @@ Run the CLI with:
 
 ## 6. Usage Example
 
-Inside the Cognex prompt:
+Inside the Cognex prompt (arguments must be double-quoted):
 
 ```text
-> PUT ("name") ("Alice is good") ---> entry 0
-> PUT ("n") ("Bob is good") -----> entry 1
+cognex> PUT "name" "Alice is good"
 [Success]
 
-> GET ("name")
+cognex> PUT "n" "Bob is good"
+[Success]
+
+cognex> GET "name"
 Alice is good
 
-> QUERY ("good")
-0
-1
+cognex> QUERY "good"
+Found entries:
+  0 key=name relevance=... similarity=...
+  1 key=n relevance=... similarity=...
 
-> DEL name
+cognex> DEL "name"
 [Success]
 
-> GET name
+cognex> GET "name"
 [NIL]
 ```
 
@@ -136,43 +142,41 @@ Supported commands are documented in more detail in `docs/guide.md`.
 
 ## 7. Benchmarks
 
-These results are from the `bench/bench.cpp` program using a dataset of **10,000 documents**.
+Results below are from the **`cognex_bench`** binary (`bench/bench.cpp`): **10,000** documents, **10,000** GETs, **10,000** single-term queries, seed **42**, fresh files under **`bench_data/`**, then `recover()`. Wall time per phase (`high_resolution_clock`), throughput = ops ÷ time. **Sample run** — your machine will differ; see `BENCHMARKS.md` for full criteria and how to reproduce.
 
 ### Benchmark Results
 
-- **Dataset size**: 10,000 documents
+- **Dataset size**: 10,000 documents  
+- **Approximate RSS after run**: 9 MB (harness-reported)
 
 #### PUT Benchmark (Index Build)
-
-Measures **indexing / document insertion performance**.
 
 | Metric              | Value              |
 |---------------------|--------------------|
 | Documents indexed   | 10,000             |
-| Index build time    | 0.995196 sec       |
-| Throughput          | 10,048 docs/sec    |
+| Index build time    | 0.527247 s         |
+| Throughput          | ~18,966 docs/s     |
+| Share of phase time | 6.65% of PUT+GET+QUERY |
 
 #### GET Benchmark
-
-Measures **direct key retrieval performance**.
 
 | Metric              | Value              |
 |---------------------|--------------------|
 | Operations          | 10,000             |
-| Total time          | 0.0240313 sec      |
-| Throughput          | 416,124 ops/sec    |
+| Total time          | 0.025308 s         |
+| Throughput          | ~395,138 ops/s     |
+| Share of phase time | 0.32% of PUT+GET+QUERY |
 
 #### QUERY Benchmark
-
-Measures **search performance over the index** using single‑term queries.
 
 | Metric              | Value              |
 |---------------------|--------------------|
 | Queries             | 10,000             |
-| Total time          | 4.55477 sec        |
-| Throughput          | 2,195 queries/sec  |
+| Total time          | 7.375877 s         |
+| Throughput          | ~1,356 queries/s   |
+| Share of phase time | 93.03% of PUT+GET+QUERY |
 
-For full methodology and notes, see `BENCHMARKS.md`.
+For methodology, criteria, and `./build/cognex_bench` usage, see `BENCHMARKS.md`.
 
 ---
 
@@ -188,8 +192,8 @@ High‑level layout:
   - `include/debug/` – debug and helper utilities.
   - `src/` – implementations for the above plus `cognex.cpp`.
 - **`cli/`**
-  - REPL, command parsing, and command implementations (`PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `HELP`, `EXIT`).
-  - `main.cpp` currently contains a commented‑out REPL entry point that wires `Cognex` to the CLI.
+  - REPL, line parser (double-quoted arguments), and command implementations (`PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `COMPACT`, `HELP`, `EXIT`).
+  - `main.cpp` opens `~/.cognex/` for `wal.log`, `snapshot.dat`, and `value.log`, calls `recover()`, then runs the REPL.
 - **`bench/`**
   - `bench.cpp` – standalone benchmark harness used for the results above.
 - **`docs/`**
@@ -202,7 +206,7 @@ High‑level layout:
 These items are either mentioned in existing docs or implied by the code but are **not all implemented yet**:
 
 - Typed values beyond raw strings. **TODO: design and implement.**
-- Value log compaction / garbage collection. **TODO.**
+- On-disk **value log** compaction / garbage collection (reclaim space in `value.log` for deleted or overwritten values). **TODO.** In-memory search structures can be compacted today; see `COMPACT` and `Cognex::compact()`.
 - Concurrency control and multi‑threaded access. **TODO.**
 - Transactions / MVCC semantics. **TODO.**
 - Compression of on‑disk structures. **TODO.**

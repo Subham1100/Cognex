@@ -24,6 +24,7 @@ public:
 	void put(Key key, Value value) override;
 	std::optional<Value> get(const Key& key) const override;
 	bool del(const Key& key) override;
+	void compact();
 	// std::vector<size_t> query(std::string_view token) const;
 	std::vector<QueryResult> query(const Query& query) const;
 	// uint64_t append_to_value_log_(uint32_t keySize, std::string_view value);
@@ -33,6 +34,7 @@ public:
 	// void rank_results(QueryContext& ctx) const;
 	// void apply_topk(QueryContext& ctx) const;
 	const Entry& get_entry(size_t entryId) const;
+
 
     //------------Recovery-----------	
 
@@ -52,6 +54,8 @@ private:
 	//------------Secondary Storages-----------
 
 	std::vector<Entry> entries_;
+	//for effective deletion
+	std::unordered_map<Key, size_t> keyToEntry_;
 	// //tokenIndex_ tokenIndex[token]->vector<"Entry.entryId"> forward indexing
 	// std::unordered_map<std::string,std::vector<size_t>,TransparentHash,TransparentEqual> tokenIndex_;
 	// posting_ posting[token]->vector<"posting"> //inverted indexing
@@ -69,6 +73,9 @@ private:
 
 	size_t snapshotWriteOps_ = 0;
 	size_t snapshotEveryNWriteOps_ = 10000000;
+
+	size_t deleteOpsSinceLastCompaction_ = 0;
+	size_t compactionDeleteThreshold_ = 10;
 
 	size_t totalTokens_ = 0;
 

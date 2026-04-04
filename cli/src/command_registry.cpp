@@ -6,6 +6,7 @@
 #include "commands/help_command.h"
 #include "commands/exit_command.h"
 #include "commands/query_command.h"
+#include "commands/compact_command.h"
 
 CommandRegistry::CommandRegistry()
 {
@@ -16,6 +17,7 @@ CommandRegistry::CommandRegistry()
     commands["HELP"] = std::make_unique<HelpCommand>();
     commands["EXIT"] = std::make_unique<ExitCommand>();
     commands["QUERY"] = std::make_unique<QueryCommand>();
+    commands["COMPACT"] = std::make_unique<CompactCommand>();
 }
 
 ICommand& CommandRegistry::resolve(const std::string& name)

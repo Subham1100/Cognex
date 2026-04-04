@@ -249,12 +249,24 @@ bool Cognex::del(const Key& key)
 Delete flow:
 
 1. Append `"DEL <key>"` to WAL via `append_wal_record`.
-2. Remove the key from `index_`.
-3. Returns `true` if a key was erased, `false` otherwise.
+2. If the key is missing from `index_`, return `false`.
+3. If the key maps to a search entry via `keyToEntry_`, mark `entries_[entryId].isDeleted = true` and remove that mapping from `keyToEntry_`.
+4. Increment `deleteOpsSinceLastCompaction_`; when it reaches `compactionDeleteThreshold_`, reset the counter and call `compact()` (see below).
+5. Erase the key from `index_` and return `true`.
 
-**Note:** deletion does not reclaim space in the value log; this would require compaction. **TODO: value log compaction / GC is not implemented.**
+**Note:** `compact()` only rewrites in-memory search structures. **On-disk** value log space is not reclaimed; value log GC remains **TODO**.
 
-#### 4.1.6 `query`
+#### 4.1.6 `compact`
+
+```cpp
+void Cognex::compact()
+```
+
+Rebuilds `entries_`, `postings_`, `keyToEntry_`, and `totalTokens_` by copying only non-deleted entries into a fresh vector, rebuilding posting lists with new contiguous `entryId` values, and swapping the new structures in. The WAL, snapshot, and `value.log` are unchanged.
+
+Invoked automatically after enough deletes (threshold in `cognex.h`) and manually via the CLI `COMPACT` command.
+
+#### 4.1.7 `query`
 
 ```cpp
 std::vector<QueryResult> Cognex::query(const Query& query) const
@@ -268,12 +280,12 @@ Search flow:
 
 The query engine uses the inverted index (`postings_`) and document statistics (`entries_`, `totalTokens_`) to rank results.
 
-#### 4.1.7 Recovery and Snapshot
+#### 4.1.8 Recovery and Snapshot
 
 - `recover()`
   - Calls `storageEngine_.recover(index_, apply_record_)`:
     - Loads snapshot into `index_`.
-    - Replays WAL, using `apply_record_` to rebuild `index_`, `entries_`, and `postings_`.
+    - Replays WAL, using `apply_record_` to apply `PUT`/`DEL` records to `index_` (and value log offsets as needed).
   - Clears search structures:
     - `entries_.clear()`, `postings_.clear()`, `totalTokens_ = 0`.
   - Rebuilds search index from recovered `index_`:
@@ -472,16 +484,14 @@ std::vector<QueryResult> QueryEngine::execute(
 
 The CLI code defines:
 
-- Command interfaces and implementations (`PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `HELP`, `EXIT`).
+- Command interfaces and implementations (`PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `COMPACT`, `HELP`, `EXIT`).
 - Parser and REPL logic (`parser`, `repl`).
 
-`cli/main.cpp` currently contains a commented‑out `main` that:
+`cli/main.cpp`:
 
-- Computes `~/.cognex` directory paths.
-- Constructs `Cognex` with `WalPath`, `SnapshotPath`, and `ValueLogPath`.
+- Ensures `~/.cognex` exists.
+- Constructs `Cognex` with `WalPath`, `SnapshotPath`, and `ValueLogPath` under that directory.
 - Calls `db.recover()` and `run_repl(db)`.
-
-This reflects the intended wiring for the CLI but may not be the active entry point depending on build configuration. **TODO: confirm the current executable wiring and update this section if needed.**
 
 ### 7.2 Benchmarks (`bench/bench.cpp`)
 
@@ -545,7 +555,7 @@ From the demonstrated benchmark harness:
 
 ## 9. Known Gaps / TODOs
 
-- Implement value log compaction / space reclamation.
+- Implement on-disk value log compaction / space reclamation (`value.log` still grows with deletes and overwrites; in-memory compaction exists via `Cognex::compact()`).
 - Wire `Query::ranking`, `QueryType`, logical operators (`useAnd`, `useOr`, `useNot`) into `QueryEngine`.
 - Support more sort fields (`DATE`, `LENGTH`) by enriching stored metadata.
 - Confirm and document the exact CLI entry point and supported options.

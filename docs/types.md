@@ -81,6 +81,7 @@ Represents a stored record participating in search.
 - `Key key`
 - `Value value`
 - `std::vector<std::string> tokens` – tokenized representation of `value`.
+- `bool isDeleted` – set on `DEL` until `Cognex::compact()` removes the entry from `entries_` / `postings_`.
 
 **Purpose**
 
