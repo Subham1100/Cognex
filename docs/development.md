@@ -37,9 +37,9 @@ The CLI binary (installed via `install.sh` or built via CMake) runs an interacti
 
 - Uses `run_repl(Cognex& db)` from `cli/src/repl.cpp`.
 - Commands:
-  - `PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `HELP`, `EXIT`.
+  - `PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `COMPACT`, `HELP`, `EXIT`.
 - Data directory:
-  - The commented `cli/main.cpp` shows the intended default path `~/.cognex`:
+  - `cli/main.cpp` uses `~/.cognex` by default:
     - `wal.log`
     - `snapshot.dat`
     - `value.log`

@@ -1,184 +1,201 @@
-// #include <iostream>
-// #include <chrono>
-// #include <vector>
-// #include <random>
-// #include <algorithm>
-// #include <fstream>
-// #include <sstream>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <random>
+#include <string>
+#include <vector>
 
-// #include "cognex.h"
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#endif
 
-// using Clock = std::chrono::high_resolution_clock;
+#include "cognex.h"
 
-// static const size_t N = 10000;
-// static const size_t QUERY_COUNT = 10000;
+using Clock = std::chrono::high_resolution_clock;
 
-// std::vector<std::string> dictionary = {
-//     "apple","banana","car","dog","elephant",
-//     "school","database","engine","search",
-//     "cloud","system","query","index","storage",
-//     "network","latency","memory","disk","wal",
-//     "performance","benchmark","random","value"
-// };
+static const std::vector<std::string> DICTIONARY = {
+    "apple",       "banana",   "car",       "dog",       "elephant", "school",
+    "database",    "engine",   "search",    "cloud",     "system",   "query",
+    "index",       "storage",  "network",   "latency",   "memory",   "disk",
+    "wal",         "snapshot", "performance", "benchmark", "random",   "value"
+};
 
-// size_t memory_usage_mb()
-// {
-//     std::ifstream file("/proc/self/status");
-//     std::string line;
+struct BenchConfig {
+    size_t docs = 10000;
+    size_t queryCount = 10000;
+    uint32_t seed = 42;
+    std::string dataDir = "bench_data";
+    bool fresh = true;
+};
 
-//     while (std::getline(file, line))
-//     {
-//         if (line.find("VmRSS:") != std::string::npos)
-//         {
-//             std::string number;
+struct BenchResult {
+    double putSeconds = 0.0;
+    double getSeconds = 0.0;
+    double querySeconds = 0.0;
+};
 
-//             for (char c : line)
-//             {
-//                 if (isdigit(c))
-//                     number += c;
-//             }
+size_t memory_usage_mb()
+{
+#if defined(__linux__)
+    std::ifstream file("/proc/self/status");
+    std::string line;
+    while (std::getline(file, line))
+    {
+        if (line.find("VmRSS:") == std::string::npos)
+            continue;
 
-//             size_t kb = std::stoul(number);
-//             return kb / 1024;
-//         }
-//     }
+        std::string number;
+        for (char c : line)
+        {
+            if (std::isdigit(static_cast<unsigned char>(c)))
+                number += c;
+        }
+        if (number.empty())
+            return 0;
+        return std::stoul(number) / 1024;
+    }
+    return 0;
+#elif defined(__APPLE__)
+    mach_task_basic_info info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    kern_return_t status = task_info(
+        mach_task_self(),
+        MACH_TASK_BASIC_INFO,
+        reinterpret_cast<task_info_t>(&info),
+        &count);
+    if (status != KERN_SUCCESS)
+        return 0;
+    return static_cast<size_t>(info.resident_size / (1024 * 1024));
+#else
+    return 0;
+#endif
+}
 
-//     return 0;
-// }
+std::string random_sentence(std::mt19937& rng)
+{
+    std::uniform_int_distribution<int> wordCountDist(3, 12);
+    std::uniform_int_distribution<int> wordPick(0, static_cast<int>(DICTIONARY.size()) - 1);
 
-// std::string random_sentence(std::mt19937& rng)
-// {
-//     std::uniform_int_distribution<int> wordCountDist(3,12);
-//     std::uniform_int_distribution<int> wordPick(0,dictionary.size()-1);
+    int wordCount = wordCountDist(rng);
+    std::string result;
+    result.reserve(static_cast<size_t>(wordCount) * 8);
 
-//     int wordCount = wordCountDist(rng);
+    for (int i = 0; i < wordCount; ++i)
+    {
+        result += DICTIONARY[static_cast<size_t>(wordPick(rng))];
+        if (i + 1 != wordCount)
+            result += " ";
+    }
 
-//     std::string result;
+    return result;
+}
 
-//     for(int i=0;i<wordCount;i++)
-//     {
-//         result += dictionary[wordPick(rng)];
+double benchmark_put(Cognex& db, size_t docs, std::mt19937& rng)
+{
+    auto start = Clock::now();
+    for (size_t i = 0; i < docs; ++i)
+    {
+        db.put(Key{"key" + std::to_string(i)}, Value{random_sentence(rng)});
+    }
+    auto end = Clock::now();
+    return std::chrono::duration<double>(end - start).count();
+}
 
-//         if(i != wordCount-1)
-//             result += " ";
-//     }
+double benchmark_get(Cognex& db, size_t docs, size_t queryCount, std::mt19937& rng)
+{
+    std::uniform_int_distribution<size_t> dist(0, docs - 1);
+    auto start = Clock::now();
+    for (size_t i = 0; i < queryCount; ++i)
+    {
+        (void)db.get(Key{"key" + std::to_string(dist(rng))});
+    }
+    auto end = Clock::now();
+    return std::chrono::duration<double>(end - start).count();
+}
 
-//     return result;
-// }
+double benchmark_query(Cognex& db, size_t queryCount, std::mt19937& rng)
+{
+    std::uniform_int_distribution<int> wordPick(0, static_cast<int>(DICTIONARY.size()) - 1);
+    auto start = Clock::now();
+    for (size_t i = 0; i < queryCount; ++i)
+    {
+        Query q;
+        q.terms.push_back(DICTIONARY[static_cast<size_t>(wordPick(rng))]);
+        q.topK = 10;
+        (void)db.query(q);
+    }
+    auto end = Clock::now();
+    return std::chrono::duration<double>(end - start).count();
+}
 
-// void benchmark_put(Cognex& db)
-// {
-//     std::mt19937 rng(42);
+BenchConfig parse_args(int argc, char** argv)
+{
+    BenchConfig cfg;
+    if (argc > 1)
+        cfg.docs = std::stoull(argv[1]);
+    if (argc > 2)
+        cfg.queryCount = std::stoull(argv[2]);
+    if (argc > 3)
+        cfg.seed = static_cast<uint32_t>(std::stoul(argv[3]));
+    if (argc > 4)
+        cfg.dataDir = argv[4];
+    return cfg;
+}
 
-//     std::cout << "\n=== PUT Benchmark (Index Build) ===\n";
+void reset_data_files(const std::filesystem::path& base)
+{
+    std::filesystem::create_directories(base);
+    std::error_code ec;
+    std::filesystem::remove(base / "wal.log", ec);
+    std::filesystem::remove(base / "snapshot.dat", ec);
+    std::filesystem::remove(base / "value.log", ec);
+}
 
-//     auto start = Clock::now();
+int main(int argc, char** argv)
+{
+    BenchConfig cfg = parse_args(argc, argv);
+    std::filesystem::path base = cfg.dataDir;
 
-//     for(size_t i=0;i<N;i++)
-//     {
-//         db.put(
-//             Key{"key"+std::to_string(i)},
-//             Value{random_sentence(rng)}
-//         );
-//     }
+    if (cfg.fresh)
+        reset_data_files(base);
+    else
+        std::filesystem::create_directories(base);
 
-//     auto end = Clock::now();
+    Cognex db(
+        WalPath{(base / "wal.log").string()},
+        SnapshotPath{(base / "snapshot.dat").string()},
+        ValueLogPath{(base / "value.log").string()});
+    db.recover();
 
-//     double seconds =
-//         std::chrono::duration<double>(end-start).count();
+    std::mt19937 rng(cfg.seed);
+    BenchResult result;
+    result.putSeconds = benchmark_put(db, cfg.docs, rng);
+    result.getSeconds = benchmark_get(db, cfg.docs, cfg.queryCount, rng);
+    result.querySeconds = benchmark_query(db, cfg.queryCount, rng);
 
-//     std::cout << "Documents indexed : " << N << "\n";
-//     std::cout << "Index build time  : " << seconds << " sec\n";
-//     std::cout << "Throughput        : "
-//               << (N/seconds)
-//               << " docs/sec\n";
-// }
+    const double total = result.putSeconds + result.getSeconds + result.querySeconds;
 
-// void benchmark_get(Cognex& db)
-// {
-//     std::mt19937 rng(42);
-//     std::uniform_int_distribution<size_t> dist(0,N-1);
+    std::cout << std::fixed << std::setprecision(6);
+    std::cout << "Cognex benchmark\n";
+    std::cout << "docs=" << cfg.docs
+              << " query_count=" << cfg.queryCount
+              << " seed=" << cfg.seed
+              << " dir=" << base.string() << "\n\n";
 
-//     std::cout << "\n=== GET Benchmark ===\n";
+    std::cout << "PUT   time=" << result.putSeconds
+              << "s throughput=" << (cfg.docs / result.putSeconds) << " docs/s\n";
+    std::cout << "GET   time=" << result.getSeconds
+              << "s throughput=" << (cfg.queryCount / result.getSeconds) << " ops/s\n";
+    std::cout << "QUERY time=" << result.querySeconds
+              << "s throughput=" << (cfg.queryCount / result.querySeconds) << " queries/s\n\n";
 
-//     auto start = Clock::now();
+    std::cout << "Time split:\n";
+    std::cout << "  PUT   " << (result.putSeconds / total) * 100.0 << "%\n";
+    std::cout << "  GET   " << (result.getSeconds / total) * 100.0 << "%\n";
+    std::cout << "  QUERY " << (result.querySeconds / total) * 100.0 << "%\n";
+    std::cout << "Memory (RSS approx): " << memory_usage_mb() << " MB\n";
 
-//     for(size_t i=0;i<QUERY_COUNT;i++)
-//     {
-//         size_t k = dist(rng);
-
-//         auto v = db.get(Key{"key"+std::to_string(k)});
-//         (void)v;
-//     }
-
-//     auto end = Clock::now();
-
-//     double seconds =
-//         std::chrono::duration<double>(end-start).count();
-
-//     std::cout << "Operations : " << QUERY_COUNT << "\n";
-//     std::cout << "Total time : " << seconds << " sec\n";
-//     std::cout << "Throughput : "
-//               << (QUERY_COUNT/seconds)
-//               << " ops/sec\n";
-// }
-
-// void benchmark_query(Cognex& db)
-// {
-//     std::mt19937 rng(42);
-//     std::uniform_int_distribution<int> wordPick(0,dictionary.size()-1);
-
-//     std::cout << "\n=== QUERY Benchmark ===\n";
-
-//     auto start = Clock::now();
-
-//     for(size_t i=0;i<QUERY_COUNT;i++)
-//     {
-//         std::string token = dictionary[wordPick(rng)];
-
-//         Query q;
-//         q.terms.push_back(token);
-//         q.topK = 10;
-
-//         auto r = db.query(q);
-//         (void)r;
-//     }
-
-//     auto end = Clock::now();
-
-//     double seconds =
-//         std::chrono::duration<double>(end-start).count();
-
-//     std::cout << "Queries     : " << QUERY_COUNT << "\n";
-//     std::cout << "Total time  : " << seconds << " sec\n";
-//     std::cout << "Throughput  : "
-//               << (QUERY_COUNT/seconds)
-//               << " queries/sec\n";
-// }
-
-// int main()
-// {
-//     std::cout << "Starting Cognex Benchmarks\n";
-
-//     Cognex db(
-//         WalPath{"wal.log"},
-//         SnapshotPath{"snapshot.dat"},
-//         ValueLogPath{"value.log"}
-//     );
-
-//     std::cout << "\nDataset target size: "
-//               << N
-//               << " documents\n";
-
-//     benchmark_put(db);
-//     benchmark_get(db);
-//     benchmark_query(db);
-
-//     std::cout << "\nMemory usage: "
-//               << memory_usage_mb()
-//               << " MB\n";
-
-//     std::cout << "\nBenchmarks complete\n";
-
-//     return 0;
-// }
+    return 0;
+}

@@ -34,7 +34,7 @@ void Cognex::apply_record_(const std::string_view& record)
         };
 
         // push_entry_(key, value);
-        indexEngine_.insert(key, value, entries_,postings_, totalTokens_);
+        indexEngine_.insert(key, value, entries_,keyToEntry_,postings_, totalTokens_);
         index_.insert_or_assign(std::move(key), indexEntry);
 
         
@@ -42,8 +42,15 @@ void Cognex::apply_record_(const std::string_view& record)
     else if (op == "DEL")
     {
         std::string_view key_sv = record.substr(p1 + 1);
-
         Key key{std::string(key_sv)};
+
+        auto it = keyToEntry_.find(key);
+        if (it != keyToEntry_.end())
+        {
+            entries_[it->second].isDeleted = true;
+            keyToEntry_.erase(it);
+        }
+
         index_.erase(key);
     }
 }
@@ -97,6 +104,7 @@ void Cognex::recover()
             key,
             *value,
             entries_,
+            keyToEntry_,
             postings_,
             totalTokens_);
     }
@@ -209,6 +217,16 @@ void Cognex::put(Key key,Value value)
     // std::move(key),
     // std::move(value)
 	// );
+
+     // STEP 1: check if key already exists
+    auto it = keyToEntry_.find(key);
+    if (it != keyToEntry_.end())
+    {
+        size_t oldEntryId = it->second;
+        entries_[oldEntryId].isDeleted = true;   // invalidate old version
+    }
+
+
     uint64_t offset = storageEngine_.append_to_value_log_(static_cast<uint32_t>(key.value.size()),value.value);
     IndexEntry indexEntry {
     offset,
@@ -220,7 +238,7 @@ void Cognex::put(Key key,Value value)
     // push_entry_(key, value);// push entry should go after append_to_log: if crash 
                             //after WAL the PUT will be there and no offset
                             // WAL-> push_entry (can take time) -> offset (this can be missed)
-    indexEngine_.insert(key, value, entries_,postings_,totalTokens_);
+    indexEngine_.insert(key, value, entries_,keyToEntry_,postings_,totalTokens_);
 
     index_.insert_or_assign(std::move(key), indexEntry);
 
@@ -241,10 +259,92 @@ bool Cognex::del(const Key& key)
 	// store_.erase(key);
 	// return true;
     storageEngine_.append_wal_record( "DEL " + key.value);
+    auto it = index_.find(key);
+    if (it == index_.end()) return false;
+
+    // mark entry deleted
+    auto entryIt = keyToEntry_.find(key);
+    if (entryIt != keyToEntry_.end())
+    {
+        size_t entryId = entryIt->second;
+        entries_[entryId].isDeleted = true;
+        keyToEntry_.erase(entryIt);
+    }
+
+    deleteOpsSinceLastCompaction_++;
+    if(deleteOpsSinceLastCompaction_ >= compactionDeleteThreshold_)
+    {
+        deleteOpsSinceLastCompaction_=0;
+        Cognex::compact();
+    }
 
         // if we delete bytes from valueLog_.log offset indexing will change.
      return index_.erase(key) > 0;
 }
+
+void Cognex::compact()
+{
+    std::vector<Entry> newEntries;
+    std::unordered_map  <std::string,
+                            std::vector<Posting>,
+                            TransparentHash,
+                            TransparentEqual> newPostings;
+
+    std::unordered_map<Key, size_t> newKeyToEntry;
+
+    newEntries.reserve(entries_.size());
+    newPostings.reserve(postings_.size());
+
+    size_t newId = 0;
+    size_t newTotalTokens = 0;
+
+    for (const auto& oldEntry : entries_)
+    {
+        if (oldEntry.isDeleted) continue;
+
+        Entry newEntry{
+            newId,
+            oldEntry.key,
+            oldEntry.value,
+            oldEntry.tokens
+        };
+
+        // TEMP aggregation (same idea as tokenizer)
+        std::unordered_map<std::string, std::pair<size_t, std::vector<size_t>>> temp;
+
+        for (size_t pos = 0; pos < newEntry.tokens.size(); ++pos)
+        {
+            const std::string& token = newEntry.tokens[pos];
+
+            auto& [freq, positions] = temp[token];
+            freq++;
+            positions.push_back(pos);
+
+            newTotalTokens++;
+        }
+
+        // single pass insert into postings
+        for (auto& [token, data] : temp)
+        {
+            newPostings[token].emplace_back(
+                newId,
+                data.first,
+                std::move(data.second)
+            );
+        }
+
+        newKeyToEntry[newEntry.key] = newId;
+        newEntries.push_back(std::move(newEntry));
+        newId++;
+    }
+
+    // atomic swap
+    entries_ = std::move(newEntries);
+    postings_ = std::move(newPostings);
+    keyToEntry_ = std::move(newKeyToEntry);
+    totalTokens_ = newTotalTokens;
+}
+
 
 // std::vector<size_t> Cognex::query(std::string_view token) const
 // {

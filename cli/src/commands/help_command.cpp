@@ -6,10 +6,12 @@ void HelpCommand::execute(Cognex&,
                           int&)
 {
     std::cout << "Commands:\n"
-              << "  PUT (\"key\") (\"value\")\n"
-              << "  GET (\"key\")\n"
-              << "  DEL (\"key\")\n"
+              << "  PUT \"key\" \"value\"\n"
+              << "  GET \"key\"\n"
+              << "  DEL \"key\"\n"
+              << "  QUERY \"terms\" [filters...]\n"
               << "  SNAPSHOT\n"
+              << "  COMPACT\n"
               << "  HELP\n"
               << "  EXIT\n";
 }

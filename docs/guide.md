@@ -19,26 +19,30 @@ chmod +x install.sh
 Run with : ```./bin/Cognex```
 
 ## Example Session
+
+Arguments use double quotes (see `cli/src/parser.cpp`):
+
 ~~~
-> PUT ("name") ("Alice is good")
+cognex> PUT "name" "Alice is good"
 [Success]
 
-> GET ("name")
+cognex> GET "name"
 Alice is good
 
-> QUERY ("good")
-0
+cognex> QUERY "good"
+Found entries:
+  0 key=name relevance=... similarity=...
 
-> DEL ("name")
+cognex> DEL "name"
 [Success]
 
-> GET ("name")
+cognex> GET "name"
 [NIL]
 ~~~
 
 ## Commands
 
-### **PUT `<key>` `<value>`**
+### **PUT `"key"` `"value"`**
 
 Stores a value under the specified key.
 
@@ -47,13 +51,13 @@ Stores a value under the specified key.
 
 **Example**
 
-PUT ("name") ("Alice")
-PUT ("age") ("20")
+PUT "name" "Alice"
+PUT "age" "20"
 
 
 ---
 
-### **GET `<key>`**
+### **GET `"key"`**
 
 Retrieves the value associated with a key.
 
@@ -62,7 +66,7 @@ Retrieves the value associated with a key.
 
 **Example**
 
-GET ("name")
+GET "name"
 
 **Output**
 
@@ -71,7 +75,7 @@ Alice
 
 ---
 
-### **DEL `<key>`**
+### **DEL `"key"`**
 
 Deletes a key and its value from storage.
 
@@ -79,20 +83,17 @@ Deletes a key and its value from storage.
 
 **Example**
 
-DEL ("age")
+DEL "age"
 
 ---
-### **QUERY `<token>`**
+### **QUERY `"terms"` [filters…]**
 
-Returns entries containing the token.
-
-Uses inverted index lookup
+Full‑text search over stored values using the inverted index. The first argument is split on whitespace into terms; optional extra quoted arguments set `top`, `relevance` / `similarity` filters, and `sortby`. See `docs/query-engine.md` and `docs/cli.md`.
 
 **Example**
 
-QUERY ("alice")
-
-return all EntryId's where the value contains the word alice.
+QUERY "alice"
+QUERY "database engine" "relevance >= 2" "top = 20" "sortby similarity"
 
 ---
 
@@ -110,6 +111,15 @@ Snapshots allow:
 
 SNAPSHOT
 
+---
+
+### **COMPACT**
+
+Runs `Cognex::compact()` to drop tombstoned search entries and rebuild postings in memory. Does not shrink the on-disk value log.
+
+**Example**
+
+COMPACT
 
 ---
 
@@ -125,7 +135,7 @@ Gracefully shuts down Cognex.
 
 ---
 
-## 🧠 Storage Behavior
+## Storage behavior
 
 ### **Key–Value Model**
 
@@ -138,9 +148,9 @@ Gracefully shuts down Cognex.
 
 `PUT` always replaces existing values.
 
-PUT x 10
-PUT x 20
-GET x → 20
+PUT "x" "10"
+PUT "x" "20"
+GET "x" → 20
 
 
 ---
@@ -159,7 +169,7 @@ See:
 
 ---
 
-## ⚠️ Current Limitations
+## Current limitations
 
 - Values are treated as strings
 - No secondary indexes
@@ -169,14 +179,10 @@ See:
 
 ---
 
-## 🚀 Future Enhancements (Planned)
+## Future Enhancements (Planned)
 
 - Typed values
-- ValueLog compaction
+- On-disk value log compaction / garbage collection (space reclamation in `value.log`)
 - Concurrency control
 - Transactions / MVCC
 - Compression
-
----
-
-## ✅ Example Session

@@ -25,7 +25,7 @@ It is designed as an educational storage engine that demonstrates:
   - Inverted index (`token → posting list`).
   - BM25‑inspired ranking and simple numeric filters.
 - **CLI / REPL**
-  - Interactive prompt for issuing commands (`PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `HELP`, `EXIT`).
+  - Interactive prompt for issuing commands (`PUT`, `GET`, `DEL`, `QUERY`, `SNAPSHOT`, `COMPACT`, `HELP`, `EXIT`).
 - **Benchmarks**
   - Built‑in benchmark harness (`bench/bench.cpp`) for PUT / GET / QUERY workloads.
 

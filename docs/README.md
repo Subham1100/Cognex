@@ -27,7 +27,7 @@ For a high‑level introduction to the project, see:
 - **Usage and Interface**
   - `guide.md` – getting started and example CLI sessions.
   - `cli.md` – REPL, parsing, and command semantics.
-  - `api.md` – DB/Persistence interfaces, WAL/snapshot APIs, and query engine entrypoints.
+  - `api.md` – DB/Persistence interfaces, WAL/snapshot APIs, query engine entrypoints, and `Cognex::compact()`.
 
 - **Performance and Versions**
   - `benchmarks.md` – benchmark harness and current results.

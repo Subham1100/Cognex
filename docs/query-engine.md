@@ -165,7 +165,7 @@ The `QUERY` command is implemented in `cli/src/commands/query_command.cpp`.
 Given:
 
 ```text
-QUERY ("alice database") ("relevance >= 2") ("top = 20") ("sortby similarity")
+QUERY "alice database" "relevance >= 2" "top = 20" "sortby similarity"
 ```
 
 The CLI:
